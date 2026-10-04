@@ -25,7 +25,7 @@ source: "Example Textbook, 1st ed."
 chapter: 4
 section: "4.07"
 pages: [212, 215]
-model: gemma3:12b-it-qat
+model: qwen2.5:32b
 generated: 2026-10-04
 generator: glosator
 tags: [signal-processing, bk1, chapter-04]
@@ -74,7 +74,9 @@ subject up in either language.
 
 - Podman, rootless. Nothing is installed on the host.
 - [Ollama](https://ollama.com) with a text model, by default
-  `gemma3:12b-it-qat`. A vision model, `qwen3-vl:8b`, is optional.
+  `qwen2.5:32b`. A vision model, `qwen3-vl:8b`, is optional. A smaller
+  text model is a reasonable trade: see the comparison in `docs/PILOT.md`
+  before making it.
   Ollama normally listens on `127.0.0.1`, which a container cannot reach
   through an ordinary network, so the unit runs the container with
   `pasta --map-host-loopback` and points `OLLAMA_URL` at
@@ -196,8 +198,9 @@ system memory.
 | measurement | value |
 |---|---|
 | extraction | approximately 2 seconds per page, on the CPU |
-| generation | approximately 4 minutes per chunk, for 2100 tokens of source and roughly 800 words of output, using `gemma3:12b-it-qat` |
-| a book of 1000 pages | on the order of 20 hours, resumable at any point |
+| generation, `qwen2.5:32b` (the default) | approximately 16 minutes per chunk, for 5900 tokens of source and roughly 800 words of output |
+| generation, `gemma3:12b-it-qat` | approximately 4 minutes per chunk, for 2100 tokens of source |
+| a book of 1000 pages | on the order of 85 hours with the default model, 20 with the smaller one; resumable at any point |
 | container image | 5.18 GB |
 
 `docs/PILOT.md` contains the full measurements, including a comparison between
@@ -226,7 +229,7 @@ Configuration is confined to `app/config.py` and the environment.
 | `GLOSATOR_IN` | `/in` | folder the books are read from, mounted read-only |
 | `GLOSATOR_OUT` | `/out` | folder the notes are written to |
 | `OLLAMA_URL` | `http://ollama:11434` | address of the Ollama instance |
-| `GLOSATOR_TEXT_MODEL` | `gemma3:12b-it-qat` | model used for the text pass |
+| `GLOSATOR_TEXT_MODEL` | `qwen2.5:32b` | model used for the text pass |
 | `GLOSATOR_VISION_MODEL` | `qwen3-vl:8b` | model used for the figure pass |
 | `GLOSATOR_OCR_LANGS` | `pol+eng` | tesseract languages |
 | `GLOSATOR_DOMAIN` | `general` | subject assumed for a book that specifies none |
