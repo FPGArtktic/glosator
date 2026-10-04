@@ -70,6 +70,12 @@ equivalents. This costs roughly 40 percent fewer output tokens than writing
 the whole note in Polish, while preserving the terminology needed to look a
 subject up in either language.
 
+The glossary is also the least reliable part of a note. The models write sound
+English prose and unreliable Polish terminology: on the measured note, four of
+six pairs were wrong on the Polish side while the surrounding explanation was
+correct. Read the glossary; do not learn from it. `docs/DECISIONS.md` records
+why the body is not written in Polish instead.
+
 ## Requirements
 
 - Podman, rootless. Nothing is installed on the host.

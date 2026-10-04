@@ -71,6 +71,38 @@ source divides it by ten.
 One of those two is extraction's fault, not the model's: OCR dropped the
 displayed inequality, leaving "In this case," followed by nothing.
 
+### The hardened rules, same model, same chunk
+
+The hard rules were written against the failures the review found, naming each
+one. The chunk was then regenerated with `qwen2.5:32b` under them and read
+against its source, with the two findings the 32B had left checked one by one.
+
+| on the same note | 32B, earlier prompt | 32B, hard rules |
+|---|---|---|
+| time | 17 min | 16 min |
+| words | ~800 | 770 |
+| the biasing criterion | stated backwards | the right way round |
+| the carried value | a number attached to the wrong quantity | gone: the ratio is given instead of the number |
+| a second name for the circuit | — | **added one the source never uses** |
+
+Both named failures are gone, and the rules cost nothing in time. A third rule
+was broken instead: the model supplied a textbook synonym for the circuit that
+does not appear in the chunk at all. A rule narrows a failure mode; it does
+not close it, and the one it narrows is the one you thought to write down.
+
+**The glossary is now the weakest part of the note.** It returned six pairs
+where the prompt asks for five to fifteen, and four of the six are wrong on
+the Polish side rather than the technical one: `collector current` rendered
+with the word for a person who collects things instead of the established
+term, `quiescent point` translated as though "quiescent" meant "quiet",
+`high-pass filter` as two contradictory filter names run together, and one
+term simply misspelled. None of these is obscure; they are the first entries
+in any Polish electronics vocabulary.
+
+So the model writes sound English prose and unreliable Polish terminology.
+That is the measurement that decides the note language: see
+`docs/DECISIONS.md`.
+
 ### Two findings that change how the book should be run
 
 **1. The glossary needs the prompt to be blunt.** gemma3's first glossary held

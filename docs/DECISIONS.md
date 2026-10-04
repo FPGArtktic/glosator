@@ -320,3 +320,24 @@ One of the 32B model's two remaining errors is not its fault. The source at
 that point is damaged: OCR dropped the displayed inequality and left "In this
 case," followed by nothing, so the model reconstructed the rule from prose and
 reconstructed it backwards. No model reads a formula that extraction lost.
+
+## 2026-10-04 — The note body stays English; the glossary is checked, not trusted
+
+The question was whether to write the notes in Polish now that a larger model
+generates them. `qwen2.5:32b` does write Polish, so the question is only
+whether it writes Polish worth studying from. On the measured note it does
+not: four of six glossary pairs were wrong on the Polish side while the
+English prose around them was sound — a literal rendering of "quiescent", the
+wrong sense of "collector", two filter names fused into one, a misspelling.
+Those are the easy terms. A body in Polish would put that failure rate through
+every sentence instead of six lines, where it is far harder to spot, and would
+cost roughly 40 percent more output tokens on top of the 85 hours a book
+already takes.
+
+The glossary stays as the place where Polish appears, and the README now says
+plainly that it is the least reliable part of a note.
+
+This is a measurement about one model, not a conclusion about the language. A
+model that knows Polish technical usage would reopen it: the body language is
+a prompt line, not an architectural choice, and the hard rules would carry
+over unchanged.
