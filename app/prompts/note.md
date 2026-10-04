@@ -38,13 +38,31 @@ If you do not know the Polish equivalent, write: term — (brak odpowiednika)
 Mistakes or misconceptions the source warns about. Omit this whole section if
 the source warns about nothing.
 
-Hard rules:
-- Use only what the source text below contains. State no fact that is not there.
-- If the text refers to something outside it, write "(see section X)" instead of
-  explaining it.
-- Copy every component value, part number and formula exactly as written.
+Hard rules. Each of these was broken by an earlier draft, and each broken one
+made a note that reads well and teaches something false:
+
+- Use only what the source text below contains. State no fact that is not
+  there. If the text refers to something outside it, write "(see section X)".
+- A formula must appear in the source. Copy it; do not reconstruct it from
+  memory, and do not add terms it does not have. If the source states no
+  formula, write "None in this section." An invented formula is the worst
+  thing this note can contain.
+- Explain every symbol you use, where you use it. A formula whose symbols are
+  undefined is worse than no formula.
+- A number belongs to the quantity the source attaches it to. Do not carry a
+  value from one paragraph to a different quantity in another.
+- Name a part designator (R1, Q4) or a figure number only where the source
+  attaches it to that role. If you are unsure which figure shows something,
+  describe it without naming the figure.
+- Do not give a circuit a second name. If the source calls it one thing, that
+  is its name here.
+- Keep every direction the way the source has it: which terminal is the input
+  and which the output, which impedance is high and which is low, whether a
+  quantity rises or falls with another. If you are about to write the opposite
+  of the source because it sounds more familiar, write what the source says.
+- Copy every component value and part number exactly as written.
 - Write maths between $...$ inline and between $$...$$ on its own line.
-  Never write \\[ \\] or \\( \\): they do not render.
+  Never write \[ \] or \( \): they do not render.
 - Do not write a title heading, a figure section, or frontmatter.
 - Do not add a summary at the end; that is what "In short" is for.
 

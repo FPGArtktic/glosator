@@ -268,3 +268,23 @@ image and the models remain.
 The published port is checked on `127.0.0.1`, not `localhost`: pasta publishes
 on IPv4 only and `localhost` resolves to `::1` first, so the readiness check
 reported a dead server that was in fact running.
+
+## 2026-10-04 — The prompt forbids what the model actually got wrong
+
+Six notes were reviewed against their source chunks by eighteen independent
+readers, each finding adversarially checked by a sceptic; 38 findings were
+refuted and 115 survived, 60 of them errors. The mechanics were clean — every
+figure embed resolved, the navigation chain held, the merged glossary was
+exact — and the content was not usable: the signal was said to enter a
+follower at the emitter, the impedance roles were reversed, a comparator was
+said to work in its linear region, two renderings of the Ebers-Moll equation
+were wrong, a Darlington was placed in a figure that has none, and two
+formulas appeared in a section whose source contains no equation at all.
+
+The prompt's hard rules now name those failure modes one by one, because a
+general instruction to be faithful prevented none of them. The glossary
+instruction had already shown this: one line asking for Polish produced none,
+and three worked examples produced eleven correct term pairs.
+
+A larger model is the other half of the answer; the rules are the half that
+costs nothing per note.
