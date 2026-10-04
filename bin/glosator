@@ -1,0 +1,171 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Mateusz <109816464+FPGArtktic@users.noreply.github.com>
+#
+# Start glosator when you want it, stop it when you are done.
+#
+# glosator is a batch job, not a service: it is not enabled at login, it does
+# not restart itself, and it holds the GPU only while a job is running. The
+# Quadlet unit is the single source of run configuration; this script fills in
+# its three paths at install time and drives it afterwards.
+
+set -eu
+
+UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/containers/systemd"
+UNIT="$UNIT_DIR/glosator.container"
+# 127.0.0.1, not localhost: pasta publishes the port on IPv4 only, and
+# localhost resolves to ::1 first on a dual-stack host.
+URL="http://127.0.0.1:7860"
+OLLAMA_URL="${OLLAMA_URL:-http://127.0.0.1:11434}"
+TEXT_MODEL="${GLOSATOR_TEXT_MODEL:-gemma3:12b-it-qat}"
+VISION_MODEL="${GLOSATOR_VISION_MODEL:-qwen3-vl:8b}"
+REPO=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+
+usage() {
+    cat <<USAGE
+usage: glosator <command>
+
+  install BOOKS NOTES   write the systemd unit for those two folders
+  uninstall             stop it and remove the unit; data is never touched
+  build                 build the container image
+  start                 start the container and open $URL
+  stop                  stop the container and free the GPU
+  status                is it running, and what holds the GPU
+  logs                  follow the container's log
+  cli ...               run a glosator command inside the running container
+
+BOOKS is the folder your PDFs are in; it is mounted read-only.
+NOTES is the folder the notes are written to; any directory will do.
+
+Nothing starts at login and nothing restarts by itself. Run 'start' when you
+want to work on a book and 'stop' when you are done.
+USAGE
+}
+
+die() {
+    echo "glosator: $*" >&2
+    exit 1
+}
+
+running() {
+    podman container exists glosator 2>/dev/null &&
+        [ "$(podman inspect -f '{{.State.Running}}' glosator 2>/dev/null)" = "true" ]
+}
+
+# Every host path the unit mounts. A missing one makes podman fail with a bare
+# "statfs: no such file or directory", which says nothing about what to do.
+unit_volumes() {
+    sed -n 's/^Volume=\(.*\):\/[a-z]*\(:.*\)\?$/\1/p' "$UNIT"
+}
+
+preflight() {
+    [ -f "$UNIT" ] || die "no unit installed; run: glosator install BOOKS NOTES"
+    missing=""
+    for path in $(unit_volumes); do
+        [ -d "$path" ] || missing="$missing  $path
+"
+    done
+    if [ -n "$missing" ]; then
+        printf 'glosator: these folders do not exist:\n%s' "$missing" >&2
+        die "create them, or re-run: glosator install BOOKS NOTES"
+    fi
+    podman image exists glosator:latest ||
+        die "no glosator:latest image; run: glosator build"
+    curl -s -m 3 -o /dev/null "$OLLAMA_URL/api/tags" ||
+        echo "glosator: warning: no Ollama at $OLLAMA_URL; extraction will" \
+             "work, generation will not" >&2
+}
+
+unload_models() {
+    # Hand the card back to whatever else runs on this machine. The worker
+    # already unloads after each job; this covers a container killed mid-run.
+    for model in "$TEXT_MODEL" "$VISION_MODEL"; do
+        curl -s -m 5 -o /dev/null \
+            -d "{\"model\":\"$model\",\"keep_alive\":0}" \
+            "$OLLAMA_URL/api/generate" || true
+    done
+}
+
+case "${1:-}" in
+install)
+    [ $# -eq 3 ] || die "usage: glosator install BOOKS NOTES"
+    books=$(CDPATH= cd -- "$2" 2>/dev/null && pwd) ||
+        die "books folder does not exist: $2"
+    mkdir -p "$3" || die "cannot create notes folder: $3"
+    notes=$(CDPATH= cd -- "$3" && pwd)
+    mkdir -p "$UNIT_DIR" "$REPO/work" "$REPO/state"
+    sed -e "s|@BOOKS@|$books|" -e "s|@NOTES@|$notes|" -e "s|@REPO@|$REPO|" \
+        "$REPO/quadlet/glosator.container" > "$UNIT"
+    systemctl --user daemon-reload
+    echo "unit written to $UNIT"
+    echo "  books (read-only): $books"
+    echo "  notes:             $notes"
+    echo "  work and state:    $REPO"
+    ;;
+uninstall)
+    systemctl --user stop glosator 2>/dev/null || true
+    systemctl --user reset-failed glosator.service 2>/dev/null || true
+    unload_models
+    podman rm -f glosator >/dev/null 2>&1 || true
+    if [ -f "$UNIT" ]; then
+        notes=$(sed -n 's|^Volume=\(.*\):/out.*|\1|p' "$UNIT")
+        rm -f "$UNIT"
+        systemctl --user daemon-reload
+        echo "removed $UNIT"
+    else
+        echo "no unit installed"
+    fi
+    # Nothing below is touched: it is either the user's data or expensive to
+    # rebuild. Say where it is instead of deciding for them.
+    echo "kept, remove by hand if you want to:"
+    [ -n "${notes:-}" ] && echo "  notes      $notes"
+    echo "  work       $REPO/work"
+    echo "  state      $REPO/state        (the job database and the logs)"
+    podman image exists glosator:latest &&
+        echo "  image      glosator:latest   (podman rmi glosator:latest)"
+    echo "  models     in Ollama           (ollama rm $TEXT_MODEL)"
+    ;;
+build)
+    podman build -t glosator:latest "$REPO"
+    ;;
+start)
+    preflight
+    systemctl --user reset-failed glosator.service 2>/dev/null || true
+    systemctl --user start glosator ||
+        die "start failed; see: journalctl --user -u glosator -n 30"
+    # The Gradio server takes a few seconds to bind.
+    for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+        if curl -s -m 2 -o /dev/null "$URL"; then break; fi
+        sleep 1
+    done
+    curl -s -m 2 -o /dev/null "$URL" ||
+        die "container started but nothing answers on $URL; see: glosator logs"
+    echo "glosator is at $URL"
+    command -v xdg-open >/dev/null 2>&1 && xdg-open "$URL" >/dev/null 2>&1 &
+    ;;
+stop)
+    systemctl --user stop glosator || true
+    unload_models
+    echo "stopped; the GPU is free"
+    ;;
+status)
+    if running; then
+        echo "running at $URL"
+    else
+        echo "not running"
+    fi
+    nvidia-smi --query-compute-apps=pid,used_memory --format=csv 2>/dev/null || true
+    ;;
+logs)
+    podman logs -f glosator
+    ;;
+cli)
+    shift
+    running || die "glosator is not running; 'glosator start' first"
+    podman exec -it glosator glosator "$@"
+    ;;
+*)
+    usage
+    exit 1
+    ;;
+esac

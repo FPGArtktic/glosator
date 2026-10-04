@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Mateusz <109816464+FPGArtktic@users.noreply.github.com>
+#
+# A template. 'bin/glosator install BOOKS NOTES' fills the three placeholders
+# in and writes the result to ~/.config/containers/systemd/. Copying this file
+# by hand works too, as long as @BOOKS@, @NOTES@ and @REPO@ are replaced with
+# absolute paths.
+[Unit]
+Description=glosator — PDF textbook to study notes
+
+[Container]
+Image=localhost/glosator:latest
+ContainerName=glosator
+UserNS=keep-id
+PublishPort=7860:7860
+
+# Ollama runs on the host and listens on 127.0.0.1, which a container cannot
+# reach through any ordinary network. map-host-loopback points
+# host.containers.internal at the host's loopback, which is the narrowest way
+# in. To use an Ollama container instead, put both on a podman network and set
+# OLLAMA_URL to that container's name.
+Network=pasta:--map-host-loopback,169.254.1.2
+Environment=OLLAMA_URL=http://host.containers.internal:11434
+
+Volume=@BOOKS@:/in:ro
+Volume=@NOTES@:/out:Z
+Volume=@REPO@/work:/work:Z
+Volume=@REPO@/state:/state:Z
+
+Environment=GLOSATOR_OCR_LANGS=pol+eng
+Environment=TZ=Europe/Warsaw
+
+[Service]
+# On demand only. glosator is a batch job: it must not start at login and must
+# not resurrect itself, because the GPU and the machine are shared with other
+# local tools. Start it with 'bin/glosator start', stop it when the book is
+# done. There is deliberately no [Install] section, so nothing enables it.
+Restart=no
+TimeoutStartSec=300
