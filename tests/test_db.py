@@ -145,3 +145,35 @@ def test_reset_running_jobs_leaves_stopped_jobs_alone(conn) -> None:
     db.request_stop(conn, job)
     db.reset_running_jobs(conn)
     assert db.claim_job(conn) is None
+
+
+def test_a_killed_job_that_was_asked_to_stop_is_not_restarted(conn) -> None:
+    # Killing the worker is how a hard stop is carried out; re-queueing the
+    # job afterwards would start the work the user just stopped.
+    book = db.upsert_book(conn, "bk1", "Example Textbook", Path("/in/a.pdf"))
+    job = db.enqueue(conn, book, "generate", "gemma3")
+    db.claim_job(conn)
+    db.request_stop(conn, job)
+
+    db.reset_running_jobs(conn)
+
+    assert db.recent_jobs(conn)[0]["status"] == db.STOPPED
+    assert db.claim_job(conn) is None
+
+
+def test_clear_finished_keeps_live_jobs_and_the_stage_record(conn) -> None:
+    # An hour-old failure under a running job reads as a current problem.
+    book = db.upsert_book(conn, "bk1", "Example Textbook", Path("/in/a.pdf"))
+    done = db.enqueue(conn, book, "extract", "none")
+    running = db.enqueue(conn, book, "generate", "gemma3")
+    waiting = db.enqueue(conn, book, "index", "none")
+    db.claim_job(conn)
+    db.finish_job(conn, done, db.FAILED, "boom")
+    db.claim_job(conn)
+    db.stage_start(conn, book, None, "extract", "none")
+    db.stage_finish(conn, book, None, "extract", "none", db.DONE)
+
+    assert db.clear_finished(conn) == 1
+
+    assert sorted(job["id"] for job in db.recent_jobs(conn)) == [running, waiting]
+    assert db.stage_done(conn, book, None, "extract", "none")

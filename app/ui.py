@@ -76,7 +76,9 @@ def job_table(conn) -> list[list[str]]:
             [
                 str(job["id"]),
                 job["stage"],
-                job["status"],
+                "stopping"
+                if job["stop"] and job["status"] == db.RUNNING
+                else job["status"],
                 f"{job['done']}/{job['total']}",
                 _eta(job),
                 job["model"],
@@ -111,21 +113,68 @@ def last_note(notes_dir: str | Path) -> str:
     return notes[0].read_text(encoding="utf-8")
 
 
+def stop_jobs(conn, job_id: float | int | None, hard: bool = False) -> str:
+    """Stop one job by id, or everything still pending when none is given.
+
+    Having to read an id out of the table and type it in before anything can
+    be stopped is not a reasonable thing to ask of someone watching a job go
+    wrong.
+    """
+    if job_id:
+        db.request_stop(conn, int(job_id))
+        return f"Stop requested for job {int(job_id)}."
+    stopped = db.stop_all(conn)
+    if not stopped:
+        return "Nothing to stop: no job is running or waiting."
+    listed = ", ".join(str(job) for job in stopped)
+    if hard and kill_worker():
+        return (
+            f"Stopped {len(stopped)} job(s): {listed}. The model call was cut "
+            "off; the chunk it was on will be generated again if you rerun."
+        )
+    return (
+        f"Stop requested for {len(stopped)} job(s): {listed}. A running stage "
+        "finishes the chunk it is on first, which can take a few minutes; the "
+        "table shows it as stopping until then."
+    )
+
+
+_worker: subprocess.Popen | None = None
+
+
 def supervise_worker() -> None:
     """Keep one worker process alive next to the UI.
 
     Restarting here rather than in a shell wrapper keeps the container to a
-    single entrypoint while the worker stays a separate process.
+    single entrypoint while the worker stays a separate process. The handle is
+    kept so that a stop can be carried out by killing it.
     """
 
     def loop() -> None:
+        global _worker
         while True:
-            process = subprocess.Popen([sys.executable, "-m", "app.worker"])
-            code = process.wait()
+            _worker = subprocess.Popen([sys.executable, "-m", "app.worker"])
+            code = _worker.wait()
+            _worker = None
             log.event("ui", "worker exited", code=code)
             time.sleep(WORKER_RESTART_S)
 
     threading.Thread(target=loop, name="worker-supervisor", daemon=True).start()
+
+
+def kill_worker() -> bool:
+    """End the current model call now, instead of after the chunk.
+
+    Safe by construction: a note is written through a temporary file and
+    renamed, the stage row of an unfinished chunk stays unfinished, and the
+    supervisor starts a fresh worker a few seconds later.
+    """
+    process = _worker
+    if process is None or process.poll() is not None:
+        return False
+    process.terminate()
+    log.event("ui", "worker killed to carry out a stop")
+    return True
 
 
 def build() -> gr.Blocks:
@@ -208,8 +257,13 @@ def build() -> gr.Blocks:
         gr.Markdown("## Jobs")
         jobs = gr.Dataframe(headers=JOB_COLUMNS, value=job_table(conn), wrap=True)
         with gr.Row():
-            stop_id = gr.Number(label="Job id to stop", precision=0)
-            stop_button = gr.Button("Stop job", variant="stop")
+            stop_button = gr.Button("Stop after this chunk", variant="stop")
+            kill_button = gr.Button("Stop now", variant="stop")
+            clear_button = gr.Button("Clear finished", size="sm")
+            stop_id = gr.Number(
+                label="or one job id, if you want to stop only that one",
+                precision=0,
+            )
 
         with gr.Row():
             logs = gr.Textbox(label="Log", lines=14, max_lines=14, value=log.tail())
@@ -422,10 +476,14 @@ def build() -> gr.Blocks:
             )
 
         def on_stop(job_id):
-            if not job_id:
-                raise gr.Error("give a job id")
-            db.request_stop(conn, int(job_id))
-            return f"Stop requested for job {int(job_id)}.", job_table(conn)
+            return stop_jobs(conn, job_id), job_table(conn)
+
+        def on_kill(job_id):
+            return stop_jobs(conn, job_id, hard=True), job_table(conn)
+
+        def on_clear():
+            removed = db.clear_finished(conn)
+            return f"Cleared {removed} finished job(s).", job_table(conn)
 
         def on_tick(notes):
             return job_table(conn), log.tail(), last_note(notes)
@@ -508,6 +566,8 @@ def build() -> gr.Blocks:
             [status, jobs],
         )
         stop_button.click(on_stop, stop_id, [status, jobs])
+        kill_button.click(on_kill, stop_id, [status, jobs])
+        clear_button.click(on_clear, outputs=[status, jobs])
         timer.tick(on_tick, notes_dir, [jobs, logs, note_preview])
 
     return blocks

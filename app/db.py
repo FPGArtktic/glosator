@@ -385,9 +385,36 @@ def request_stop(conn: sqlite3.Connection, job_id: int) -> None:
     )
 
 
+def stop_all(conn: sqlite3.Connection) -> list[int]:
+    """Ask every unfinished job to stop. Returns the ids it asked.
+
+    Stopping only the running job would be no use: the stages of one book are
+    queued together, so the next would start a second later.
+    """
+    rows = conn.execute(
+        "SELECT id FROM jobs WHERE status IN (?, ?) ORDER BY id", (QUEUED, RUNNING)
+    ).fetchall()
+    for row in rows:
+        request_stop(conn, row["id"])
+    return [int(row["id"]) for row in rows]
+
+
 def stop_requested(conn: sqlite3.Connection, job_id: int) -> bool:
     row = conn.execute("SELECT stop FROM jobs WHERE id = ?", (job_id,)).fetchone()
     return row is not None and bool(row["stop"])
+
+
+def clear_finished(conn: sqlite3.Connection) -> int:
+    """Forget jobs that are over, so the table shows only live work.
+
+    A failure from an hour ago sitting under a running job reads as a current
+    problem. Only the queue rows go; what each stage completed is recorded in
+    stage_runs and is what makes a rerun skip finished work.
+    """
+    cursor = conn.execute(
+        "DELETE FROM jobs WHERE status IN (?, ?, ?)", (DONE, FAILED, STOPPED)
+    )
+    return cursor.rowcount
 
 
 def recent_jobs(conn: sqlite3.Connection, limit: int = 20) -> list[sqlite3.Row]:
@@ -397,8 +424,16 @@ def recent_jobs(conn: sqlite3.Connection, limit: int = 20) -> list[sqlite3.Row]:
 
 
 def reset_running_jobs(conn: sqlite3.Connection) -> None:
-    """Re-queue jobs a killed worker left marked running."""
+    """Settle the jobs a killed worker left marked running.
+
+    One that was asked to stop is finished as stopped: the kill is how the
+    stop was carried out, and re-queueing it would start the work again.
+    """
     conn.execute(
         "UPDATE jobs SET status = ?, started = NULL WHERE status = ? AND stop = 0",
         (QUEUED, RUNNING),
+    )
+    conn.execute(
+        "UPDATE jobs SET status = ?, finished = ? WHERE status = ? AND stop = 1",
+        (STOPPED, _now(), RUNNING),
     )

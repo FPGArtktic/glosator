@@ -76,3 +76,91 @@ def test_job_table_has_a_row_per_job() -> None:
     assert len(rows) == 1
     assert rows[0][1] == "generate"
     assert rows[0][2] == db.QUEUED
+
+
+def test_stop_without_an_id_stops_everything_pending() -> None:
+    # What pressing Stop with an empty field used to do: raise "give a job id"
+    # at someone who was watching a job go wrong.
+    from app import db
+
+    conn = db.connect()
+    book = db.upsert_book(conn, "bk1", "Example Textbook", Path("/in/a.pdf"))
+    first = db.enqueue(conn, book, "extract", "none")
+    second = db.enqueue(conn, book, "generate", config.TEXT_MODEL)
+    db.claim_job(conn)
+
+    message = ui.stop_jobs(conn, None)
+
+    assert str(first) in message and str(second) in message
+    assert db.stop_requested(conn, first)
+    assert db.stop_requested(conn, second)
+    conn.close()
+
+
+def test_stop_with_an_id_stops_only_that_job() -> None:
+    from app import db
+
+    conn = db.connect()
+    book = db.upsert_book(conn, "bk1", "Example Textbook", Path("/in/a.pdf"))
+    first = db.enqueue(conn, book, "extract", "none")
+    second = db.enqueue(conn, book, "generate", config.TEXT_MODEL)
+
+    ui.stop_jobs(conn, second)
+
+    assert not db.stop_requested(conn, first)
+    assert db.stop_requested(conn, second)
+    conn.close()
+
+
+def test_stop_when_there_is_nothing_to_stop() -> None:
+    from app import db
+
+    conn = db.connect()
+    assert "Nothing to stop" in ui.stop_jobs(conn, None)
+    conn.close()
+
+
+def test_the_table_shows_a_pending_stop_as_stopping() -> None:
+    # A running job that has been asked to stop looked exactly like one that
+    # had not, so pressing stop appeared to do nothing for several minutes.
+    from app import db
+
+    conn = db.connect()
+    book = db.upsert_book(conn, "bk1", "Example Textbook", Path("/in/a.pdf"))
+    job = db.enqueue(conn, book, "generate", config.TEXT_MODEL)
+    db.claim_job(conn)
+    db.request_stop(conn, job)
+
+    assert ui.job_table(conn)[0][2] == "stopping"
+    conn.close()
+
+
+def test_a_hard_stop_without_a_worker_falls_back_to_the_graceful_one() -> None:
+    from app import db
+
+    conn = db.connect()
+    book = db.upsert_book(conn, "bk1", "Example Textbook", Path("/in/a.pdf"))
+    db.enqueue(conn, book, "generate", config.TEXT_MODEL)
+
+    message = ui.stop_jobs(conn, None, hard=True)
+
+    assert "finishes the chunk it is on first" in message
+    conn.close()
+
+
+def test_clearing_finished_jobs_leaves_the_running_one() -> None:
+    from app import db
+
+    conn = db.connect()
+    book = db.upsert_book(conn, "bk1", "Example Textbook", Path("/in/a.pdf"))
+    old = db.enqueue(conn, book, "index", "none")
+    db.claim_job(conn)
+    db.finish_job(conn, old, db.FAILED, "an hour ago")
+    db.enqueue(conn, book, "generate", config.TEXT_MODEL)
+    db.claim_job(conn)
+
+    db.clear_finished(conn)
+
+    rows = ui.job_table(conn)
+    assert [row[1] for row in rows] == ["generate"]
+    conn.close()

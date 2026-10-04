@@ -168,6 +168,15 @@ def _do_generate(conn: sqlite3.Connection, job: sqlite3.Row) -> None:
             db.job_progress(conn, job["id"], position, len(chunks))
             continue
         db.stage_start(conn, job["book_id"], chunk_id, "generate", model)
+        # A chunk takes minutes, during which the progress column does not
+        # move. Say what is being written, so the log tail shows a pulse.
+        log.event(
+            "generate",
+            "writing note",
+            section=item.section,
+            title=item.title,
+            position=f"{position}/{len(chunks)}",
+        )
         try:
             path = generate.run(
                 item,
