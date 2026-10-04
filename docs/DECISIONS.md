@@ -288,3 +288,35 @@ and three worked examples produced eleven correct term pairs.
 
 A larger model is the other half of the answer; the rules are the half that
 costs nothing per note.
+
+## 2026-10-04 — The text model is qwen2.5:32b, which supersedes the table in CLAUDE.md
+
+`CLAUDE.md` fixes the text model at `gemma3:12b-it-qat`, chosen for fitting
+4 GB of VRAM with CPU offload. Measured against the review, it does not earn
+the row. Both models were given the identical chunk, the identical prompt and
+the identical reviewers — three independent lenses, every finding handed to a
+sceptic who tried to refute it:
+
+|                    | gemma3:12b-it-qat | qwen2.5:32b |
+|--------------------|-------------------|-------------|
+| confirmed findings | 30                | 9           |
+| of them errors     | 19                | 5           |
+| time for one note  | ~4 min            | 17 min      |
+
+The kinds changed as much as the counts. The 12B model wrote that the signal
+enters an emitter follower at the emitter, invented a "common cathode
+amplifier", reversed which impedance is high, and put two formulas in a
+section whose source contains no equation. What survives at 32B is subtler: a
+biasing criterion stated backwards, and a value carried from the right
+quantity to the wrong one.
+
+The cost is four times the wall clock: roughly 85 hours for a whole book
+rather than 20. That is the trade, and it is the right way round for notes
+someone will study from. The model stays per job: `--model` on the command
+line, a dropdown in the interface, and `GLOSATOR_TEXT_MODEL` for the default,
+so a long run on a book that matters less can still use the 12B.
+
+One of the 32B model's two remaining errors is not its fault. The source at
+that point is damaged: OCR dropped the displayed inequality and left "In this
+case," followed by nothing, so the model reconstructed the rule from prose and
+reconstructed it backwards. No model reads a formula that extraction lost.

@@ -42,6 +42,35 @@ that log line.
 ~300 chunks of this book that is **about 20 hours**, inside the 25-30 h the
 hardware note predicts.
 
+### The model comparison, measured by review rather than by reading
+
+Six notes were reviewed against their source chunks: three independent lenses
+each, every finding then handed to a sceptic whose job was to refute it. 38
+findings were refuted, 115 survived, 60 of those errors — roughly 23 distinct
+defects over six notes. The mechanics were faultless: 75 figure embeds all
+resolving, an unbroken navigation chain, a 58-term merged glossary, every note
+inside the length target. The content was not usable.
+
+The same chunk was then regenerated with `qwen2.5:32b` and put through the
+identical reviewers:
+
+| on the same note | `gemma3:12b-it-qat` | `qwen2.5:32b` |
+|---|---|---|
+| confirmed findings | 30 | 9 |
+| of them errors | 19 | 5 |
+| time | ~4 min | 17 min |
+
+What the 12B model got wrong was fundamental: the signal entering a follower at
+the emitter, an invented "common cathode amplifier", the impedance roles
+reversed, a comparator said to work in its linear region, two renderings of
+Ebers-Moll both wrong, a Darlington placed in a figure that has none, two
+formulas in a section whose source contains no equation. What the 32B model
+got wrong was a biasing criterion stated backwards and 750k written where the
+source divides it by ten.
+
+One of those two is extraction's fault, not the model's: OCR dropped the
+displayed inequality, leaving "In this case," followed by nothing.
+
 ### Two findings that change how the book should be run
 
 **1. The glossary needs the prompt to be blunt.** gemma3's first glossary held

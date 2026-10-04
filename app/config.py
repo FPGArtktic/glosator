@@ -29,7 +29,7 @@ DB_PATH: Path = STATE_DIR / "glosator.db"
 PROMPT_DIR: Path = Path(__file__).parent / "prompts"
 
 OLLAMA_URL: str = os.environ.get("OLLAMA_URL", "http://ollama:11434")
-TEXT_MODEL: str = os.environ.get("GLOSATOR_TEXT_MODEL", "gemma3:12b-it-qat")
+TEXT_MODEL: str = os.environ.get("GLOSATOR_TEXT_MODEL", "qwen2.5:32b")
 VISION_MODEL: str = os.environ.get("GLOSATOR_VISION_MODEL", "qwen3-vl:8b")
 
 # Ollama request options, applied to every call (see CLAUDE.md).
