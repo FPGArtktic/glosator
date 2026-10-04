@@ -1,15 +1,23 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Mateusz <109816464+FPGArtktic@users.noreply.github.com>
-"""The contract the rest of the tree relies on: paths, and the fixed options."""
+"""The contract the rest of the tree relies on.
+
+Paths, the fixed Ollama options, and the model names the launcher reads back
+out of this module rather than keeping its own copy of.
+"""
 
 from __future__ import annotations
 
 import importlib
+import os
+import subprocess
 from pathlib import Path
 
 import pytest
 
 from app import config
+
+LAUNCHER = Path(__file__).resolve().parent.parent / "bin" / "glosator"
 
 
 def _reload(monkeypatch: pytest.MonkeyPatch, **environment: str):
@@ -91,3 +99,43 @@ def test_the_ollama_options_are_the_ones_claude_md_fixes() -> None:
 def test_the_chunk_budget_fits_inside_the_context_window() -> None:
     prompt_and_answer = config.CHUNK_MAX_TOKENS + config.NUM_PREDICT
     assert prompt_and_answer < config.NUM_CTX
+
+
+def _launcher_models(environment: dict[str, str] | None = None) -> list[str]:
+    """Run the launcher's own ``models()`` against the real app/config.py.
+
+    The function is lifted out of the script rather than reimplemented here:
+    a copy of it in the test would pass while the script itself was wrong,
+    which is precisely the failure this test exists to catch.
+    """
+    script = (
+        f"eval \"$(sed -n '/^models()/,/^}}/p' {LAUNCHER})\"\n"
+        f"REPO={LAUNCHER.parent.parent}\n"
+        "models\n"
+    )
+    result = subprocess.run(
+        ["sh", "-c", script],
+        capture_output=True,
+        text=True,
+        check=True,
+        env={**os.environ, **(environment or {})},
+    )
+    return result.stdout.split()
+
+
+def test_the_launcher_keeps_no_model_name_of_its_own() -> None:
+    # A second copy of the default went stale when config.py changed, and the
+    # launcher then unloaded a model the app had never loaded while still
+    # reporting a free GPU. The names have one home: app/config.py.
+    text = LAUNCHER.read_text(encoding="utf-8")
+    assert "gemma3" not in text
+    assert "qwen" not in text
+
+
+def test_the_launcher_unloads_the_models_config_names() -> None:
+    assert _launcher_models() == [config.TEXT_MODEL, config.VISION_MODEL]
+
+
+def test_the_launcher_honours_a_model_chosen_in_the_environment() -> None:
+    models = _launcher_models({"GLOSATOR_TEXT_MODEL": "chosen-by-hand:latest"})
+    assert models[0] == "chosen-by-hand:latest"

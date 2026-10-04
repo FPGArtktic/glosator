@@ -17,8 +17,6 @@ UNIT="$UNIT_DIR/glosator.container"
 # localhost resolves to ::1 first on a dual-stack host.
 URL="http://127.0.0.1:7860"
 OLLAMA_URL="${OLLAMA_URL:-http://127.0.0.1:11434}"
-TEXT_MODEL="${GLOSATOR_TEXT_MODEL:-gemma3:12b-it-qat}"
-VISION_MODEL="${GLOSATOR_VISION_MODEL:-qwen3-vl:8b}"
 REPO=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 
 usage() {
@@ -76,10 +74,30 @@ preflight() {
              "work, generation will not" >&2
 }
 
+# The model names belong to app/config.py. A second copy of them here went
+# stale the moment the default changed, so the launcher asked Ollama to unload
+# a model the app had never loaded: the real one stayed resident while 'stop'
+# still reported a free GPU. config.py reads the same GLOSATOR_*_MODEL
+# variables and imports nothing outside the standard library, so ask it.
+models() {
+    python3 -c '
+import sys
+
+sys.path.insert(0, sys.argv[1])
+from app import config
+
+print(config.TEXT_MODEL)
+print(config.VISION_MODEL)
+' "$REPO" 2>/dev/null && return 0
+    echo "glosator: cannot read the model names from app/config.py; unload" \
+         "them by hand with: ollama stop <model>" >&2
+}
+
 unload_models() {
     # Hand the card back to whatever else runs on this machine. The worker
     # already unloads after each job; this covers a container killed mid-run.
-    for model in "$TEXT_MODEL" "$VISION_MODEL"; do
+    models | while read -r model; do
+        [ -n "$model" ] || continue
         curl -s -m 5 -o /dev/null \
             -d "{\"model\":\"$model\",\"keep_alive\":0}" \
             "$OLLAMA_URL/api/generate" || true
@@ -123,7 +141,8 @@ uninstall)
     echo "  state      $REPO/state        (the job database and the logs)"
     podman image exists glosator:latest &&
         echo "  image      glosator:latest   (podman rmi glosator:latest)"
-    echo "  models     in Ollama           (ollama rm $TEXT_MODEL)"
+    text_model=$(models | head -1)
+    echo "  models     in Ollama           (ollama rm ${text_model:-<model>})"
     ;;
 build)
     podman build -t glosator:latest "$REPO"
