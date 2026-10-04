@@ -315,3 +315,41 @@ def test_running_head_survives_crlf_line_endings() -> None:
     # book tested; the carriage return used to end up inside the note title.
     text = "SAMPLING \r\n4.07 Limits of the sampling method 212 \r\nbody\r\n"
     assert chunk_module.running_head(text) == ("4.07", "Limits of the sampling method")
+
+
+def test_split_to_budget_leaves_a_small_range_alone(monkeypatch) -> None:
+    monkeypatch.setattr(chunk_module.pdf, "page_text", lambda _p, _f, _l: "x" * 400)
+    assert chunk_module.split_to_budget(Path("/b.pdf"), 13, 16) == [(13, 16)]
+
+
+def test_split_to_budget_cuts_a_long_range_at_page_boundaries(monkeypatch) -> None:
+    # Every page is a third of the budget, so three pages fit and the fourth
+    # starts a new slice.
+    page = "x" * (config.CHUNK_MAX_TOKENS // 3 * config.CHARS_PER_TOKEN)
+    monkeypatch.setattr(chunk_module.pdf, "page_text", lambda _p, _f, _l: page)
+    assert chunk_module.split_to_budget(Path("/b.pdf"), 1, 7) == [
+        (1, 3),
+        (4, 6),
+        (7, 7),
+    ]
+
+
+def test_split_to_budget_keeps_an_oversized_page_whole(monkeypatch) -> None:
+    page = "x" * ((config.CHUNK_MAX_TOKENS + 1) * config.CHARS_PER_TOKEN)
+    monkeypatch.setattr(chunk_module.pdf, "page_text", lambda _p, _f, _l: page)
+    assert chunk_module.split_to_budget(Path("/b.pdf"), 5, 6) == [(5, 5), (6, 6)]
+
+
+def test_plan_cuts_a_forty_page_range_into_readable_chunks(monkeypatch) -> None:
+    # What pressing "Run everything" on pages 13-56 actually produced: one
+    # chunk of 28607 tokens, which the generate stage refused.
+    page = "x" * (650 * config.CHARS_PER_TOKEN)
+    monkeypatch.setattr(chunk_module.pdf, "page_count", lambda _path: 200)
+    monkeypatch.setattr(chunk_module.pdf, "page_text", lambda _p, _f, _l: page)
+
+    chunks = chunk_module.plan("bk1", Path("/b.pdf"), page_ranges=[(13, 56)])
+
+    assert len(chunks) > 1
+    assert chunk_module.oversized(chunks) == []
+    assert chunks[0].page_start == 13
+    assert chunks[-1].page_end == 56

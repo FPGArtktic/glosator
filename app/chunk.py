@@ -145,6 +145,31 @@ def spans_from_bookmarks(
     return [span for span in spans if span.title.strip() in wanted]
 
 
+def split_to_budget(
+    pdf_path: Path, first_page: int, last_page: int
+) -> list[tuple[int, int]]:
+    """Cut a page range into consecutive slices that fit the token budget.
+
+    A range is a boundary the operator drew, not a note: forty-four pages of a
+    textbook are five times what the model can read at once. Pages are never
+    split, so a single page over the budget stays whole and the generate stage
+    refuses it.
+    """
+    sizes = {
+        page: estimate_tokens(pdf.page_text(pdf_path, page, page))
+        for page in range(first_page, last_page + 1)
+    }
+    slices: list[tuple[int, int]] = []
+    start, total = first_page, 0
+    for page in range(first_page, last_page + 1):
+        if total and total + sizes[page] > config.CHUNK_MAX_TOKENS:
+            slices.append((start, page - 1))
+            start, total = page, 0
+        total += sizes[page]
+    slices.append((start, last_page))
+    return slices
+
+
 def outline_problems(bookmarks: Sequence[Bookmark]) -> list[str]:
     """Reasons this PDF's outline cannot be trusted to drive chunking.
 
@@ -222,7 +247,9 @@ def plan(
     page_total = pdf.page_count(pdf_path)
     if page_ranges:
         spans = [
-            Span(f"pages {start}-{end}", 0, start, end) for start, end in page_ranges
+            Span(f"pages {start}-{end}", 0, start, end)
+            for first_page, last_page in page_ranges
+            for start, end in split_to_budget(pdf_path, first_page, last_page)
         ]
     else:
         bookmarks = pdf.read_toc(pdf_path)
@@ -233,7 +260,8 @@ def plan(
         raise ValueError("no bookmarks selected and no page ranges given")
 
     texts = [span_text(book_slug, pdf_path, span) for span in spans]
-    # Explicit page ranges are an instruction: one chunk per range, no merging.
+    # Page ranges are boundaries the operator drew: they are never merged
+    # across, and split_to_budget has already cut them to a readable size.
     if page_ranges:
         groups = [[span] for span in spans]
     else:

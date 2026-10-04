@@ -118,10 +118,24 @@ has to be driven by page ranges.
 A span ends at the next bookmark that does not point backwards, so one broken
 destination cannot collapse a whole chapter into a single page.
 
+## 2026-10-04 — A page range is a boundary, and is cut to fit
+
+**Amended the same day, after the first real use.** A range the operator draws
+says where a part of the book begins and ends; it does not say how much a
+model can read at once. Pressing "run everything" on pages 13-56 produced one
+chunk of 28607 tokens, nearly five times `CHUNK_MAX_TOKENS` and twice
+`num_ctx`, which the generate stage refused — correctly, but the only way
+forward was to type eight ranges by hand.
+
+`chunk.split_to_budget` now cuts a range into consecutive slices that fit,
+packing whole pages greedily. Ranges are still never merged across, and a
+single page over the budget stays whole and is refused, because splitting a
+page would cut a sentence.
+
 ## 2026-10-04 — An oversized chunk fails instead of being truncated
 
-Explicit page ranges are honoured as given, so a 26-page range can be three
-times `CHUNK_MAX_TOKENS` and twice `num_ctx`. Ollama would silently drop the
+A chunk can still exceed the budget: one enormous page, or a bookmarked
+section longer than the window. Ollama would silently drop the
 overflow and the note would describe half a section without saying so.
 `chunk.plan` logs every chunk over budget and `generate.run` refuses it before
 calling the model, so the chunk is recorded as failed and the page range can
