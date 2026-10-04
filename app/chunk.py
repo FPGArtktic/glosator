@@ -86,13 +86,27 @@ def running_head(text: str) -> tuple[str, str] | None:
     counts: Counter[str] = Counter()
     titles: dict[str, str] = {}
     for match in RUNNING_HEAD_RE.finditer(text):
-        number = match.group(1)
+        number, title = _reunite_split_number(match.group(1), match.group(2).strip())
         counts[number] += 1
-        titles.setdefault(number, match.group(2).strip())
+        titles.setdefault(number, title)
     if not counts:
         return None
     number = max(counts, key=counts.__getitem__)
     return number, titles[number]
+
+
+def _reunite_split_number(number: str, title: str) -> tuple[str, str]:
+    """Repair a section number OCR split in two: "2.1 1 Title" is 2.11.
+
+    The first book tested prints the same section head both ways on different
+    pages, so the broken form would otherwise become its own section, with the
+    stray digit in the note's title and in every link to it. Only a lone digit
+    is reunited, and only with a number that has a single decimal place.
+    """
+    split = re.match(r"^(\d)\s+(\S.*)$", title)
+    if split and re.fullmatch(r"\d+\.\d", number):
+        return number + split.group(1), split.group(2)
+    return number, title
 
 
 def identify(span: Span, text: str, order: int) -> tuple[int | None, str, str]:

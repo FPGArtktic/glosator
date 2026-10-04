@@ -353,3 +353,21 @@ def test_plan_cuts_a_forty_page_range_into_readable_chunks(monkeypatch) -> None:
     assert chunk_module.oversized(chunks) == []
     assert chunks[0].page_start == 13
     assert chunks[-1].page_end == 56
+
+
+def test_running_head_reunites_a_section_number_split_by_ocr() -> None:
+    # The first book tested prints "2.11" as "2.1 1" on some pages, which put
+    # the stray digit into the note's title and into every link to it.
+    head = "2.1 1 The emitter follower revisited"
+    text = f"{head} 72\n{head} 74\n"
+    assert chunk_module.running_head(text) == ("2.11", "The emitter follower revisited")
+
+
+def test_running_head_leaves_a_title_that_really_starts_with_a_number() -> None:
+    text = "3.5 2N3904 characteristics 88\n3.5 2N3904 characteristics 90\n"
+    assert chunk_module.running_head(text) == ("3.5", "2N3904 characteristics")
+
+
+def test_running_head_does_not_glue_onto_a_two_decimal_number() -> None:
+    text = "2.11 1 of 3 approaches 72\n2.11 1 of 3 approaches 74\n"
+    assert chunk_module.running_head(text)[0] == "2.11"
