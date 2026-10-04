@@ -188,12 +188,19 @@ def build() -> gr.Blocks:
                     refresh_models = gr.Button("Refresh models", size="sm")
 
         with gr.Row():
+            run_all = gr.Button(
+                "Run everything  (extract → chunk → generate → index)",
+                variant="primary",
+                scale=2,
+            )
             preview_button = gr.Button("Preview extraction (3 pages)")
-            queue_extract = gr.Button("Queue extract", variant="primary")
-            queue_chunk = gr.Button("Queue chunk")
-            queue_generate = gr.Button("Queue generate", variant="primary")
-            queue_vision = gr.Button("Queue vision")
-            queue_index = gr.Button("Queue index")
+        with gr.Row():
+            gr.Markdown("Or one stage at a time, in this order:")
+            queue_extract = gr.Button("1. extract", size="sm")
+            queue_chunk = gr.Button("2. chunk", size="sm")
+            queue_generate = gr.Button("3. generate", size="sm")
+            queue_index = gr.Button("4. index", size="sm")
+            queue_vision = gr.Button("figures (optional)", size="sm")
 
         status = gr.Markdown()
         preview_output = gr.Markdown(label="Extraction preview")
@@ -228,7 +235,16 @@ def build() -> gr.Blocks:
         def _selected_pages(books, choice, uploaded, pages_value, section_labels):
             path = resolve_pdf(books, choice, uploaded)
             if pages_value.strip():
-                ranges = chunk_module.parse_page_ranges(pages_value)
+                try:
+                    ranges = chunk_module.parse_page_ranges(pages_value)
+                except ValueError as error:
+                    # The field is next to several others; say which one is
+                    # wrong and what belongs in it, not what the parser hit.
+                    raise gr.Error(
+                        f"Page ranges: {error}. The field takes numbers only, "
+                        "like 13-56 or 13-56, 70-72. Did the book title end "
+                        "up there?"
+                    ) from error
                 return path, ranges[0][0], ranges[-1][1], ranges
             titles = [label_to_title(label) for label in section_labels or []]
             if not titles:
@@ -339,6 +355,72 @@ def build() -> gr.Blocks:
                 job_table(conn),
             )
 
+        def on_run_all(
+            books,
+            notes,
+            title_value,
+            slug_value,
+            domain_value,
+            choice,
+            uploaded,
+            pages_value,
+            section_labels,
+            ocr_value,
+            model_value,
+        ):
+            """Queue the whole book in one press.
+
+            The worker takes one job at a time in the order they were queued,
+            so each stage finds the previous one's output waiting for it.
+            """
+            log.event(
+                "ui",
+                "run everything pressed",
+                title=title_value,
+                slug=slug_value,
+                domain=domain_value,
+                pages=pages_value,
+                sections=len(section_labels or []),
+                model=model_value,
+            )
+            book_id = _book_id(
+                books, notes, title_value, slug_value, domain_value, choice, uploaded
+            )
+            _path, first, last, ranges = _selected_pages(
+                books, choice, uploaded, pages_value, section_labels
+            )
+            sections_chosen = [label_to_title(label) for label in section_labels or []]
+            queued = [
+                db.enqueue(
+                    conn,
+                    book_id,
+                    "extract",
+                    "none",
+                    json.dumps(
+                        {
+                            "first_page": first,
+                            "last_page": last,
+                            "ocr_langs": ocr_value,
+                        }
+                    ),
+                ),
+                db.enqueue(
+                    conn,
+                    book_id,
+                    "chunk",
+                    "none",
+                    json.dumps({"page_ranges": ranges, "sections": sections_chosen}),
+                ),
+                db.enqueue(conn, book_id, "generate", model_value, json.dumps({})),
+                db.enqueue(conn, book_id, "index", "none", json.dumps({})),
+            ]
+            return (
+                f"Queued jobs {queued[0]}-{queued[-1]} for pages {first}-{last}. "
+                "Watch the table below; notes appear one by one in "
+                f"{resolve_out_dir(notes)}.",
+                job_table(conn),
+            )
+
         def on_stop(job_id):
             if not job_id:
                 raise gr.Error("give a job id")
@@ -406,6 +488,23 @@ def build() -> gr.Blocks:
                 "index", "none", b, n, t, s, d, c, u
             ),
             [books_dir, notes_dir, title, slug, domain, source, upload],
+            [status, jobs],
+        )
+        run_all.click(
+            on_run_all,
+            [
+                books_dir,
+                notes_dir,
+                title,
+                slug,
+                domain,
+                source,
+                upload,
+                pages,
+                sections,
+                ocr,
+                model,
+            ],
             [status, jobs],
         )
         stop_button.click(on_stop, stop_id, [status, jobs])
