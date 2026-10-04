@@ -61,6 +61,7 @@ def glossary_note(
         "---",
         f'source: "{book_title}"',
         "type: glossary",
+        f"generator: {generate.GENERATOR}",
         f"tags: [{generate.extract.slugify(domain)}, {book_tag}, glossary]",
         "---",
         "# Glossary",

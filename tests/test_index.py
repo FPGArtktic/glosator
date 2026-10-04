@@ -160,3 +160,27 @@ def test_moc_of_an_unnamed_chapter_is_named_by_its_number() -> None:
 
     assert (config.OUT_DIR / "04" / "04.md").exists()
     assert not (config.OUT_DIR / "04" / "04 .md").exists()
+
+
+def test_the_glossary_carries_the_generator_marker() -> None:
+    text = index.glossary_note([("bias", "polaryzacja", ["2.3.1 X"])], "Book", "bk1")
+    assert generate.is_ours_text(text)
+
+
+def test_a_chapter_map_carries_the_generator_marker() -> None:
+    chunks = [_chunk(1, "2.1", "Basics", 71)]
+    text = index.chapter_moc(2, "Transistors", chunks, "Book", "bk1")
+    assert generate.is_ours_text(text)
+
+
+def test_run_can_be_repeated() -> None:
+    # The second run used to fail on the glossary it had written itself,
+    # because the index stage left the generator marker off its own output.
+    chunks = [_chunk(1, "2.3.1", "A section", 71)]
+    titles = {2: "Transistors"}
+    generate.write_note(generate.note_path(chunks[0], titles[2]), NOTE)
+
+    first = index.run(chunks, titles, book_title="Book", book_tag="bk1")
+    second = index.run(chunks, titles, book_title="Book", book_tag="bk1")
+
+    assert first == second
