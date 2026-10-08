@@ -142,6 +142,13 @@ def test_note_path_follows_the_vault_layout(chunk: Chunk) -> None:
     assert generate.note_path(unnumbered, "").parent.name == "00-unsorted"
 
 
+def test_chapter_folder_names_the_three_cases(chunk: Chunk) -> None:
+    assert generate.chapter_folder(chunk, "Transistors") == "02-transistors"
+    assert generate.chapter_folder(chunk, "") == "02"
+    unnumbered = Chunk(1, None, "001", "Preface", 1, 2, Path("x.md"))
+    assert generate.chapter_folder(unnumbered, "Transistors") == "00-unsorted"
+
+
 def test_write_atomic_leaves_no_temporary_file(tmp_path: Path) -> None:
     target = tmp_path / "deep" / "note.md"
     generate.write_atomic(target, "first")

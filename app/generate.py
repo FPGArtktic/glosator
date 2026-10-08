@@ -169,6 +169,20 @@ def out_root(out_dir: Path | str | None = None) -> Path:
     return Path(out_dir) if out_dir else config.OUT_DIR
 
 
+def chapter_folder(chunk: Chunk, chapter_title: str) -> str:
+    """Subfolder a chunk's output belongs in.
+
+    Shared by every stage that writes a per-chunk file, so the trees they
+    build stay parallel and a chapter is found in the same place in each.
+    """
+    if chunk.chapter is None:
+        return "00-unsorted"
+    if chapter_title.strip():
+        return f"{chunk.chapter:02d}-{extract.slugify(chapter_title)}"
+    # The chapter's own title is unknown; its number alone is honest.
+    return f"{chunk.chapter:02d}"
+
+
 def note_path(
     chunk: Chunk, chapter_title: str, out_dir: Path | str | None = None
 ) -> Path:
@@ -177,15 +191,8 @@ def note_path(
     The output folder is an ordinary directory chosen by the user; it does not
     have to be an Obsidian vault (see docs/DECISIONS.md).
     """
-    if chunk.chapter is None:
-        folder = "00-unsorted"
-    elif chapter_title.strip():
-        folder = f"{chunk.chapter:02d}-{extract.slugify(chapter_title)}"
-    else:
-        # The chapter's own title is unknown; its number alone is honest.
-        folder = f"{chunk.chapter:02d}"
     name = f"{chunk.section} {chunk.title}".strip()
-    return out_root(out_dir) / folder / f"{name}.md"
+    return out_root(out_dir) / chapter_folder(chunk, chapter_title) / f"{name}.md"
 
 
 def is_ours_text(text: str) -> bool:
