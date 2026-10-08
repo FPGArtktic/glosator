@@ -283,3 +283,104 @@ def test_a_book_without_a_field_falls_back_to_the_configured_one(
     worker._run_job(conn, job)
 
     assert seen == [config.DEFAULT_DOMAIN, config.DEFAULT_DOMAIN]
+
+
+def _queue_export(conn, book_id, params: dict | None = None):
+    db.enqueue(conn, book_id, "export", "none", json.dumps(params or {}))
+    return db.claim_job(conn)
+
+
+def test_export_job_writes_the_prompt_and_every_section(queued, monkeypatch) -> None:
+    conn, book_id, _job = queued
+    plan = _plan("bk1")
+    monkeypatch.setattr(
+        worker.chunk_module, "plan", lambda *_a, **_k: plan, raising=True
+    )
+    monkeypatch.setattr(worker.extract, "load_figures", lambda _slug: [])
+    prompts: list[int] = []
+    monkeypatch.setattr(
+        worker.export,
+        "write_prompt",
+        lambda _t, _s, count, *_a: prompts.append(count),
+    )
+    seen: list[str] = []
+    monkeypatch.setattr(
+        worker.export,
+        "run",
+        lambda chunk, _title, **_k: seen.append(chunk.section),
+    )
+
+    worker._run_job(conn, _queue_export(conn, book_id))
+
+    assert prompts == [2]
+    assert seen == ["2.1", "2.2"]
+    assert db.recent_jobs(conn)[0]["status"] == db.DONE
+    assert db.recent_jobs(conn)[0]["done"] == 2
+
+
+def test_export_job_plans_at_the_export_budget(queued, monkeypatch) -> None:
+    """The export must not reuse, or overwrite, the plan the notes are made
+    from: its files are larger and its sections are different."""
+    conn, book_id, _job = queued
+    budgets: list[object] = []
+
+    def fake_plan(_slug, _path, selected=None, page_ranges=None, *, budget=None):
+        budgets.append(budget)
+        return []
+
+    monkeypatch.setattr(worker.chunk_module, "plan", fake_plan)
+    monkeypatch.setattr(worker.extract, "load_figures", lambda _slug: [])
+    monkeypatch.setattr(worker.export, "write_prompt", lambda *_a: None)
+
+    worker._run_job(conn, _queue_export(conn, book_id))
+
+    assert budgets == [chunk_module.export_budget()]
+
+
+def test_export_job_does_not_touch_the_gpu(queued, monkeypatch) -> None:
+    conn, book_id, _job = queued
+    unloaded: list[str] = []
+    monkeypatch.setattr(worker.ollama, "unload", lambda model: unloaded.append(model))
+    monkeypatch.setattr(worker.chunk_module, "plan", lambda *_a, **_k: [])
+    monkeypatch.setattr(worker.extract, "load_figures", lambda _slug: [])
+    monkeypatch.setattr(worker.export, "write_prompt", lambda *_a: None)
+
+    worker._run_job(conn, _queue_export(conn, book_id))
+
+    assert unloaded == []
+
+
+def test_export_job_passes_the_page_ranges_it_was_queued_with(
+    queued, monkeypatch
+) -> None:
+    conn, book_id, _job = queued
+    ranges: list[object] = []
+
+    def fake_plan(_slug, _path, selected=None, page_ranges=None, *, budget=None):
+        ranges.append(page_ranges)
+        return []
+
+    monkeypatch.setattr(worker.chunk_module, "plan", fake_plan)
+    monkeypatch.setattr(worker.extract, "load_figures", lambda _slug: [])
+    monkeypatch.setattr(worker.export, "write_prompt", lambda *_a: None)
+
+    worker._run_job(conn, _queue_export(conn, book_id, {"page_ranges": [[71, 96]]}))
+
+    assert ranges == [[(71, 96)]]
+
+
+def test_a_stop_ends_an_export_before_the_remaining_sections(
+    queued, monkeypatch
+) -> None:
+    conn, book_id, _job = queued
+    plan = _plan("bk1")
+    monkeypatch.setattr(worker.chunk_module, "plan", lambda *_a, **_k: plan)
+    monkeypatch.setattr(worker.extract, "load_figures", lambda _slug: [])
+    monkeypatch.setattr(worker.export, "write_prompt", lambda *_a: None)
+    monkeypatch.setattr(worker.export, "run", lambda *_a, **_k: None)
+
+    job = _queue_export(conn, book_id)
+    db.request_stop(conn, job["id"])
+    worker._run_job(conn, job)
+
+    assert db.recent_jobs(conn)[0]["status"] == db.STOPPED

@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from app import chunk as chunk_module
-from app import config, db, extract, generate, index, log, ollama, vision
+from app import config, db, export, extract, generate, index, log, ollama, vision
 
 _running = True
 
@@ -56,6 +56,7 @@ def _run_job(conn: sqlite3.Connection, job: sqlite3.Row) -> None:
         "generate": _do_generate,
         "vision": _do_vision,
         "index": _do_index,
+        "export": _do_export,
     }
     handler = handlers.get(stage)
     if handler is None:
@@ -280,6 +281,53 @@ def _do_index(conn: sqlite3.Connection, job: sqlite3.Row) -> None:
     )
     db.job_progress(conn, job["id"], len(written), len(written))
     db.stage_finish(conn, job["book_id"], None, "index", job["model"], db.DONE)
+
+
+def _do_export(conn: sqlite3.Connection, job: sqlite3.Row) -> None:
+    """Write the sections out for a model elsewhere. Never touches the GPU.
+
+    Book-wide rather than per chunk: with no model call there is nothing worth
+    resuming, and the plan this stage builds is its own, at its own token
+    budget, so it must not be recorded in the chunks the notes are made from.
+    """
+    book = _book(conn, job)
+    params = _params(job)
+    stage, model = "export", job["model"]
+    db.stage_start(conn, job["book_id"], None, stage, model)
+
+    ranges = [tuple(pair) for pair in params.get("page_ranges") or []]
+    chunks = chunk_module.plan(
+        book["slug"],
+        Path(book["pdf_path"]),
+        selected=params.get("sections"),
+        page_ranges=ranges or None,
+        budget=chunk_module.export_budget(),
+    )
+    titles = chunk_module.chapter_titles(chunks)
+    figures = extract.load_figures(book["slug"])
+    root = export.export_root(book["slug"], _out_dir(book))
+
+    db.job_progress(conn, job["id"], 0, len(chunks))
+    export.write_prompt(
+        book["title"], book["slug"], len(chunks), _out_dir(book), _domain(book)
+    )
+    for position, item in enumerate(chunks, start=1):
+        if db.stop_requested(conn, job["id"]):
+            db.stage_finish(conn, job["book_id"], None, stage, model, db.STOPPED)
+            return
+        export.run(
+            item,
+            titles.get(item.chapter or 0, ""),
+            book_slug=book["slug"],
+            book_title=book["title"],
+            book_tag=book["slug"],
+            figures=figures,
+            out_dir=_out_dir(book),
+            domain=_domain(book),
+        )
+        db.job_progress(conn, job["id"], position, len(chunks))
+
+    db.stage_finish(conn, job["book_id"], None, stage, model, db.DONE, root)
 
 
 if __name__ == "__main__":
