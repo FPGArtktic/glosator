@@ -13,6 +13,12 @@ cropped from the page, a bilingual glossary and the pitfalls the source warns
 about. The notes are plain files with YAML frontmatter and `[[wikilinks]]`:
 Obsidian reads them, and so do ordinary command-line tools.
 
+Writing a book's notes on the reference machine takes on the order of 85
+hours. The half before the model call takes minutes, so the pipeline can also
+stop there: the `export` stage writes the book's own extracted text out as one
+markdown file per section, ready to hand to a model elsewhere. See
+[Without a local model](#without-a-local-model).
+
 ## Example output
 
 A note has the structure below. Both the book and its content are invented
@@ -132,6 +138,13 @@ bin/glosator cli index    --book calc1
 bin/glosator cli queue
 ```
 
+Or, stopping before the model:
+
+```sh
+bin/glosator cli extract --book calc1 --pages 71-96
+bin/glosator cli export  --book calc1 --pages 71-96
+```
+
 When the work is done, stop it. `stop` also unloads the models, so the GPU is
 free for whatever else uses it.
 
@@ -152,9 +165,10 @@ every chunk would dominate the running time.
 
 ## How it works
 
-The pipeline has five stages. Extraction and chunking prepare the source;
+The pipeline has six stages. Extraction and chunking prepare the source;
 generation writes the notes; the figure pass and the index are applied
-afterwards.
+afterwards. The export stage is an alternative to the last three: it stops
+where the model would start.
 
 | stage | description |
 |---|---|
@@ -163,12 +177,44 @@ afterwards.
 | generate | One model call per chunk, producing one note. |
 | vision | Optional and separate: one call per figure, with the description inserted beneath the figure in its note. |
 | index | Chapter maps, the combined glossary, and previous/next links. No model is involved. |
+| export | The extracted sections written out verbatim, one file per section, for a model that is not on this machine. No model is involved. |
 
 Each stage records its completed work in SQLite, keyed on the tuple
 `(book, chunk, stage, model)`. The container can be killed at any point: the
 next run resumes rather than starting again, a chunk that failed is retried,
 and a chunk that succeeded is not rewritten. Re-running the figure pass
 retries precisely the figures that failed.
+
+## Without a local model
+
+The **Run without a local LLM** button, and the `export` stage behind it, run
+extraction and then write the sections out as they are. No Ollama call is
+made and the GPU stays idle.
+
+```
+<notes>/
+  _source/
+    calc1/
+      _PROMPT.md                 the instructions, once per book
+      04-sampling/
+        4.07 Limits of the sampling method.md
+      figures/
+        fig-212-1.png
+```
+
+Each file carries the book, the section number and the page range in its
+frontmatter, then the figures of those pages, then the source text. The
+instructions are in `_PROMPT.md` rather than at the head of every file,
+because they are the same instructions every time: hand that over once, then
+a section file per note wanted.
+
+These files are cut larger than the ones the local model is given — 12 to 20
+thousand tokens rather than 3 to 6 — because nothing has to fit in 4 GB of
+VRAM at the other end. `GLOSATOR_EXPORT_MIN_TOKENS` and
+`GLOSATOR_EXPORT_MAX_TOKENS` change that.
+
+The exported files carry `generator: glosator`, so the same safeguards below
+apply to them: a rerun replaces its own output and nothing else.
 
 ## Safeguards for an existing note collection
 
@@ -239,6 +285,8 @@ Configuration is confined to `app/config.py` and the environment.
 | `GLOSATOR_VISION_MODEL` | `qwen3-vl:8b` | model used for the figure pass |
 | `GLOSATOR_OCR_LANGS` | `pol+eng` | tesseract languages |
 | `GLOSATOR_DOMAIN` | `general` | subject assumed for a book that specifies none |
+| `GLOSATOR_EXPORT_MIN_TOKENS` | `12000` | smallest export file, in tokens of source |
+| `GLOSATOR_EXPORT_MAX_TOKENS` | `20000` | largest export file, in tokens of source |
 
 ## Development
 

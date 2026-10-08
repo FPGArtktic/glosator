@@ -341,3 +341,54 @@ This is a measurement about one model, not a conclusion about the language. A
 model that knows Polish technical usage would reopen it: the body language is
 a prompt line, not an architectural choice, and the hard rules would carry
 over unchanged.
+
+## 2026-10-08 — A stage that stops where the model starts
+
+A book costs on the order of 85 hours of this machine's GPU. Extraction and
+chunking cost minutes: seconds per page, on the CPU, and they are the part
+this machine does well. The output of that cheap half is a book cut into
+sections with their page ranges recorded — which is most of what anyone needs
+to write notes from it, whoever writes them.
+
+Nothing could read it. The section text sat in `work/<slug>/chunks/` under
+names like `001-2-03.md`, with no indication of which book or which pages it
+came from, in a directory that exists for the worker's benefit. So the choice
+was to generate locally or to get nothing.
+
+The `export` stage writes those sections into the notes folder instead, one
+markdown file per section, each with its source, section number and page
+range in frontmatter and the figure crops of those pages linked beside it. It
+imports no Ollama client. That absence is the stage: a UI button that promises
+no GPU has to be a path on which no GPU call is reachable, not one where it
+happens not to be made.
+
+Three decisions inside it.
+
+**The files go to `<notes>/_source/<slug>/`, not to `work/`.** The work
+directory is the worker's, gitignored and structured for its convenience; the
+notes folder is the one the operator already chooses in the interface and
+already looks in. The leading underscore keeps the book's own text sorted away
+from the notes written about it. They carry `generator: glosator`, so the
+existing ownership check covers them unchanged: a rerun replaces its own
+output and refuses anything else, exactly as for a note.
+
+**The instructions go in one `_PROMPT.md`, not at the head of every file.**
+They are the same instructions every time. Repeating them across eighty files
+is eighty copies to keep in step with `prompts/note.md`, and the duplication
+is already one copy more than is comfortable — `prompts/export.md` restates
+the same contract for a reader that gets one file at a time, and says in its
+own text that `note.md` is where the rules are maintained.
+
+**The export is cut larger than the notes pass: 12–20k tokens of source
+rather than 3–6k.** The local budget exists because 4 GB of VRAM exists.
+Nothing at the other end has that limit, so cutting a chapter into
+six-thousand-token pieces would only mean more files to hand over for no
+reason. This needed `chunk.plan` to take a budget rather than read one from
+`config`, and the two budgets carry their own subfolder and manifest so a
+second pass over the same book cannot land on the first one's files.
+
+What this does not do is check the result. A note written elsewhere does not
+pass through `generate.assemble`, so its frontmatter, section order and figure
+embeds are whatever the model produced, and the `index` stage will treat a
+file without the generator marker as someone else's and leave it alone. Notes
+brought back from an export are the operator's to place.
