@@ -127,3 +127,19 @@ def test_add_records_the_field_the_book_belongs_to() -> None:
     conn = db.connect()
     assert conn.execute("SELECT domain FROM books").fetchone()[0] == "calculus"
     conn.close()
+
+
+def test_queue_export_needs_no_model_and_takes_page_ranges() -> None:
+    cli.main(["add", "/in/book.pdf", "--title", "Book", "--slug", "bk1"])
+    assert cli.main(["export", "--book", "bk1", "--pages", "71-96"]) == 0
+
+    job = _jobs()[0]
+    assert job["stage"] == "export"
+    assert job["model"] == "none"
+    assert json.loads(job["params"])["page_ranges"] == [[71, 96]]
+
+
+def test_queue_export_without_page_ranges_uses_the_outline() -> None:
+    cli.main(["add", "/in/book.pdf", "--title", "Book", "--slug", "bk1"])
+    assert cli.main(["export", "--book", "bk1"]) == 0
+    assert "page_ranges" not in json.loads(_jobs()[0]["params"])

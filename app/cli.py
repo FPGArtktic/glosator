@@ -14,7 +14,7 @@ from pathlib import Path
 from app import chunk as chunk_module
 from app import config, db, extract, worker
 
-STAGES = ("extract", "chunk", "generate", "vision", "index")
+STAGES = ("extract", "chunk", "generate", "vision", "index", "export")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -61,19 +61,25 @@ def _parser() -> argparse.ArgumentParser:
     )
 
     for stage in STAGES:
-        stage_parser = sub.add_parser(stage, help=f"queue the {stage} stage")
+        stage_parser = sub.add_parser(stage, help=_stage_help(stage))
         stage_parser.add_argument("--book", required=True, help="book slug")
         stage_parser.add_argument("--model", default=None)
         stage_parser.add_argument("--force", action="store_true")
         if stage == "extract":
             stage_parser.add_argument("--pages", required=True, help="e.g. 60-120")
             stage_parser.add_argument("--ocr", default=config.OCR_LANGS)
-        if stage == "chunk":
+        if stage in ("chunk", "export"):
             stage_parser.add_argument("--pages", default=None)
 
     sub.add_parser("queue", help="list jobs")
     sub.add_parser("worker", help="run the queue consumer in the foreground")
     return parser
+
+
+def _stage_help(stage: str) -> str:
+    if stage == "export":
+        return "queue the export stage: the book's own text, no model called"
+    return f"queue the {stage} stage"
 
 
 def _add(conn, args) -> int:
@@ -102,7 +108,7 @@ def _queue_stage(conn, args) -> int:
             "last_page": ranges[-1][1],
             "ocr_langs": args.ocr,
         }
-    if args.command == "chunk" and args.pages:
+    if args.command in ("chunk", "export") and args.pages:
         params["page_ranges"] = chunk_module.parse_page_ranges(args.pages)
 
     job_id = db.enqueue(conn, book_id, args.command, model, json.dumps(params))
