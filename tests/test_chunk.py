@@ -371,3 +371,78 @@ def test_running_head_leaves_a_title_that_really_starts_with_a_number() -> None:
 def test_running_head_does_not_glue_onto_a_two_decimal_number() -> None:
     text = "2.11 1 of 3 approaches 72\n2.11 1 of 3 approaches 74\n"
     assert chunk_module.running_head(text)[0] == "2.11"
+
+
+def test_the_two_budgets_write_to_separate_files(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Neither pass may land on the other's plan: both are kept side by side."""
+    bookmarks = [Bookmark("2 Transistors", 0, 10), Bookmark("2.1 Basics", 1, 11)]
+    monkeypatch.setattr(chunk_module.pdf, "page_count", lambda _path: 20)
+    monkeypatch.setattr(chunk_module.pdf, "read_toc", lambda _path: bookmarks)
+    monkeypatch.setattr(
+        chunk_module.pdf, "page_text", lambda _p, first, last: f"text {first}-{last}"
+    )
+    pdf_path = Path("/nonexistent/book.pdf")
+
+    chunk_module.plan("bk1", pdf_path)
+    notes_manifest = config.WORK_DIR / "bk1" / chunk_module.CHUNKS_JSON
+    before = notes_manifest.read_bytes()
+
+    exported = chunk_module.plan("bk1", pdf_path, budget=chunk_module.export_budget())
+
+    assert notes_manifest.read_bytes() == before
+    assert (config.WORK_DIR / "bk1" / chunk_module.EXPORT_CHUNKS_JSON).exists()
+    assert exported[0].text_path.parent.name == "chunks-export"
+    assert (config.WORK_DIR / "bk1" / "chunks").is_dir()
+
+
+def test_load_plan_reads_the_plan_of_the_budget_it_is_given(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(chunk_module.pdf, "page_count", lambda _path: 20)
+    monkeypatch.setattr(chunk_module.pdf, "read_toc", lambda _path: [])
+    monkeypatch.setattr(
+        chunk_module.pdf, "page_text", lambda _p, first, last: f"text {first}-{last}"
+    )
+    pdf_path = Path("/nonexistent/book.pdf")
+    chunk_module.plan("bk1", pdf_path, page_ranges=[(1, 2)])
+    chunk_module.plan(
+        "bk1", pdf_path, page_ranges=[(5, 6)], budget=chunk_module.export_budget()
+    )
+
+    assert chunk_module.load_plan("bk1")[0].page_start == 1
+    exported = chunk_module.load_plan("bk1", budget=chunk_module.export_budget())
+    assert exported[0].page_start == 5
+
+
+def test_the_export_budget_merges_further_than_the_note_budget() -> None:
+    """The point of the second budget: fewer files, each holding more."""
+    spans = [_span(f"2.{number}", number) for number in range(1, 9)]
+    sizes = [config.CHUNK_MIN_TOKENS // 2] * 8
+
+    for_notes = chunk_module.group_spans(spans, sizes)
+    for_export = chunk_module.group_spans(
+        spans, sizes, budget=chunk_module.export_budget()
+    )
+
+    assert len(for_notes) == 4
+    assert len(for_export) == 1
+
+
+def test_split_to_budget_honours_a_larger_ceiling(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    page = "x" * (config.CHUNK_MAX_TOKENS * config.CHARS_PER_TOKEN)
+    monkeypatch.setattr(chunk_module.pdf, "page_text", lambda _p, _f, _l: page)
+    pdf_path = Path("/nonexistent/book.pdf")
+
+    assert len(chunk_module.split_to_budget(pdf_path, 1, 3)) == 3
+    assert (
+        len(
+            chunk_module.split_to_budget(
+                pdf_path, 1, 3, max_tokens=config.CHUNK_MAX_TOKENS * 3
+            )
+        )
+        == 1
+    )

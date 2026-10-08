@@ -31,6 +31,39 @@ RUNNING_HEAD_RE = re.compile(
     re.MULTILINE,
 )
 CHUNKS_JSON = "chunks.json"
+EXPORT_CHUNKS_JSON = "chunks-export.json"
+
+
+@dataclass(frozen=True)
+class Budget:
+    """Token sizes for one chunking pass, and where its output goes.
+
+    Two passes exist over the same book: one sized for the model on this
+    machine, one for the export stage. They must not land on each other's
+    files, so the subfolder and the manifest travel with the sizes.
+    """
+
+    min_tokens: int
+    max_tokens: int
+    subdir: str
+    manifest: str
+
+
+def note_budget() -> Budget:
+    """Chunks sized for the local model: one chunk is one note."""
+    return Budget(
+        config.CHUNK_MIN_TOKENS, config.CHUNK_MAX_TOKENS, "chunks", CHUNKS_JSON
+    )
+
+
+def export_budget() -> Budget:
+    """Chunks sized for a model elsewhere. See config.EXPORT_MIN_TOKENS."""
+    return Budget(
+        config.EXPORT_MIN_TOKENS,
+        config.EXPORT_MAX_TOKENS,
+        "chunks-export",
+        EXPORT_CHUNKS_JSON,
+    )
 
 
 @dataclass(frozen=True)
@@ -160,7 +193,11 @@ def spans_from_bookmarks(
 
 
 def split_to_budget(
-    pdf_path: Path, first_page: int, last_page: int
+    pdf_path: Path,
+    first_page: int,
+    last_page: int,
+    *,
+    max_tokens: int | None = None,
 ) -> list[tuple[int, int]]:
     """Cut a page range into consecutive slices that fit the token budget.
 
@@ -169,6 +206,7 @@ def split_to_budget(
     split, so a single page over the budget stays whole and the generate stage
     refuses it.
     """
+    ceiling = max_tokens if max_tokens is not None else config.CHUNK_MAX_TOKENS
     sizes = {
         page: estimate_tokens(pdf.page_text(pdf_path, page, page))
         for page in range(first_page, last_page + 1)
@@ -176,7 +214,7 @@ def split_to_budget(
     slices: list[tuple[int, int]] = []
     start, total = first_page, 0
     for page in range(first_page, last_page + 1):
-        if total and total + sizes[page] > config.CHUNK_MAX_TOKENS:
+        if total and total + sizes[page] > ceiling:
             slices.append((start, page - 1))
             start, total = page, 0
         total += sizes[page]
@@ -213,25 +251,31 @@ def outline_problems(bookmarks: Sequence[Bookmark]) -> list[str]:
     return problems
 
 
-def group_spans(spans: Sequence[Span], token_counts: Sequence[int]) -> list[list[Span]]:
+def group_spans(
+    spans: Sequence[Span],
+    token_counts: Sequence[int],
+    *,
+    budget: Budget | None = None,
+) -> list[list[Span]]:
     """Merge consecutive spans into chunks within the token budget.
 
     Never splits a span, never merges across a chapter boundary.
     """
+    sizes = budget or note_budget()
     groups: list[list[Span]] = []
     current: list[Span] = []
     current_tokens = 0
 
     for span, tokens in zip(spans, token_counts, strict=True):
         crosses_chapter = bool(current) and span.chapter != current[0].chapter
-        too_big = bool(current) and current_tokens + tokens > config.CHUNK_MAX_TOKENS
+        too_big = bool(current) and current_tokens + tokens > sizes.max_tokens
         if crosses_chapter or too_big:
             groups.append(current)
             current, current_tokens = [], 0
 
         current.append(span)
         current_tokens += tokens
-        if current_tokens >= config.CHUNK_MIN_TOKENS:
+        if current_tokens >= sizes.min_tokens:
             groups.append(current)
             current, current_tokens = [], 0
 
@@ -256,14 +300,19 @@ def plan(
     pdf_path: Path,
     selected: Sequence[str] | None = None,
     page_ranges: Sequence[tuple[int, int]] | None = None,
+    *,
+    budget: Budget | None = None,
 ) -> list[Chunk]:
     """Build the chunk plan and write one text file per chunk."""
+    sizes = budget or note_budget()
     page_total = pdf.page_count(pdf_path)
     if page_ranges:
         spans = [
             Span(f"pages {start}-{end}", 0, start, end)
             for first_page, last_page in page_ranges
-            for start, end in split_to_budget(pdf_path, first_page, last_page)
+            for start, end in split_to_budget(
+                pdf_path, first_page, last_page, max_tokens=sizes.max_tokens
+            )
         ]
     else:
         bookmarks = pdf.read_toc(pdf_path)
@@ -279,10 +328,12 @@ def plan(
     if page_ranges:
         groups = [[span] for span in spans]
     else:
-        groups = group_spans(spans, [estimate_tokens(text) for text in texts])
+        groups = group_spans(
+            spans, [estimate_tokens(text) for text in texts], budget=sizes
+        )
     text_by_span = dict(zip(spans, texts, strict=True))
 
-    chunk_dir = config.WORK_DIR / book_slug / "chunks"
+    chunk_dir = config.WORK_DIR / book_slug / sizes.subdir
     chunk_dir.mkdir(parents=True, exist_ok=True)
 
     chunks: list[Chunk] = []
@@ -306,9 +357,9 @@ def plan(
             )
         )
 
-    _write_plan(book_slug, chunks)
+    _write_plan(book_slug, chunks, sizes.manifest)
     log.event("chunk", "planned", book=book_slug, chunks=len(chunks), spans=len(spans))
-    for chunk in oversized(chunks):
+    for chunk in oversized(chunks, max_tokens=sizes.max_tokens):
         log.event(
             "chunk",
             "chunk over budget; the generate stage will refuse it",
@@ -316,22 +367,22 @@ def plan(
             section=chunk.section,
             pages=[chunk.page_start, chunk.page_end],
             tokens=estimate_tokens(chunk.text_path.read_text(encoding="utf-8")),
-            budget=config.CHUNK_MAX_TOKENS,
+            budget=sizes.max_tokens,
         )
     return chunks
 
 
-def oversized(chunks: Sequence[Chunk]) -> list[Chunk]:
+def oversized(chunks: Sequence[Chunk], *, max_tokens: int | None = None) -> list[Chunk]:
     """Chunks whose source text does not fit the model's context window.
 
     Only reachable through explicit page ranges: a range is honoured as given,
     and a 26-page range of a textbook is three times the budget.
     """
+    ceiling = max_tokens if max_tokens is not None else config.CHUNK_MAX_TOKENS
     return [
         chunk
         for chunk in chunks
-        if estimate_tokens(chunk.text_path.read_text(encoding="utf-8"))
-        > config.CHUNK_MAX_TOKENS
+        if estimate_tokens(chunk.text_path.read_text(encoding="utf-8")) > ceiling
     ]
 
 
@@ -345,8 +396,8 @@ def _unique(section: str, used: set[str]) -> str:
     return candidate
 
 
-def _write_plan(book_slug: str, chunks: Sequence[Chunk]) -> None:
-    path = config.WORK_DIR / book_slug / CHUNKS_JSON
+def _write_plan(book_slug: str, chunks: Sequence[Chunk], manifest: str) -> None:
+    path = config.WORK_DIR / book_slug / manifest
     records = [
         {
             "ord": chunk.ord,
@@ -379,8 +430,8 @@ def chapter_titles(chunks: Sequence[Chunk]) -> dict[int, str]:
     return titles
 
 
-def load_plan(book_slug: str) -> list[Chunk]:
-    path = config.WORK_DIR / book_slug / CHUNKS_JSON
+def load_plan(book_slug: str, *, budget: Budget | None = None) -> list[Chunk]:
+    path = config.WORK_DIR / book_slug / (budget or note_budget()).manifest
     records = json.loads(path.read_text(encoding="utf-8"))
     return [
         Chunk(

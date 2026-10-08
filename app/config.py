@@ -51,6 +51,14 @@ OLLAMA_KEEP_ALIVE: str = "30m"
 CHUNK_MIN_TOKENS: int = 3000
 CHUNK_MAX_TOKENS: int = 6000
 
+# The same budget for the export stage, which writes files for a model that
+# is not this machine's. Nothing has to fit in 4 GB of VRAM there, so the
+# files are longer: fewer of them to hand over, and more of a chapter in
+# front of the reader at once. Overridable because the right size depends on
+# whose window they are going into.
+EXPORT_MIN_TOKENS: int = int(os.environ.get("GLOSATOR_EXPORT_MIN_TOKENS", "12000"))
+EXPORT_MAX_TOKENS: int = int(os.environ.get("GLOSATOR_EXPORT_MAX_TOKENS", "20000"))
+
 # Rough token estimate for English and Polish technical prose. Only used to
 # decide merging, never to size a request exactly.
 CHARS_PER_TOKEN: int = 4
