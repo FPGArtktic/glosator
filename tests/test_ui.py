@@ -164,3 +164,14 @@ def test_clearing_finished_jobs_leaves_the_running_one() -> None:
     rows = ui.job_table(conn)
     assert [row[1] for row in rows] == ["generate"]
     conn.close()
+
+
+def test_last_note_ignores_the_export_tree(tmp_path: Path) -> None:
+    """The export files carry the same marker but nothing wrote them."""
+    exported = tmp_path / ui.export.EXPORT_DIRNAME / "bk1" / "02"
+    exported.mkdir(parents=True)
+    (exported / "2.1 Basics.md").write_text(
+        f"---\ngenerator: {ui.generate.GENERATOR}\nstage: export\n---\n# source\n",
+        encoding="utf-8",
+    )
+    assert ui.last_note(tmp_path) == "_no notes yet_"

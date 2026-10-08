@@ -22,7 +22,7 @@ from pathlib import Path
 import gradio as gr
 
 from app import chunk as chunk_module
-from app import config, db, extract, generate, log, ollama, pdf
+from app import config, db, export, extract, generate, log, ollama, pdf
 
 WORKER_RESTART_S = 5.0
 JOB_COLUMNS = ["id", "stage", "status", "progress", "eta", "model", "error"]
@@ -104,7 +104,13 @@ def last_note(notes_dir: str | Path) -> str:
     if not directory.is_dir():
         return "_notes folder not found_"
     notes = sorted(
-        (path for path in directory.rglob("*.md") if generate.is_ours(path)),
+        (
+            path
+            for path in directory.rglob("*.md")
+            # The export tree carries the same ownership marker, and its files
+            # are the book's own text. This pane is for what a model wrote.
+            if export.EXPORT_DIRNAME not in path.parts and generate.is_ours(path)
+        ),
         key=lambda path: path.stat().st_mtime,
         reverse=True,
     )
@@ -244,12 +250,23 @@ def build() -> gr.Blocks:
             )
             preview_button = gr.Button("Preview extraction (3 pages)")
         with gr.Row():
+            run_no_llm = gr.Button(
+                "Run without a local LLM  (extract → export)", scale=2
+            )
+            gr.Markdown(
+                "Writes the book's own text to `_source/<slug>/`, one file "
+                "per section, with the instructions in `_PROMPT.md` beside "
+                "them. Nothing is generated and the GPU stays idle: minutes "
+                "rather than hours."
+            )
+        with gr.Row():
             gr.Markdown("Or one stage at a time, in this order:")
             queue_extract = gr.Button("1. extract", size="sm")
             queue_chunk = gr.Button("2. chunk", size="sm")
             queue_generate = gr.Button("3. generate", size="sm")
             queue_index = gr.Button("4. index", size="sm")
             queue_vision = gr.Button("figures (optional)", size="sm")
+            queue_export = gr.Button("export (no model)", size="sm")
 
         status = gr.Markdown()
         preview_output = gr.Markdown(label="Extraction preview")
@@ -389,6 +406,31 @@ def build() -> gr.Blocks:
             job = db.enqueue(conn, book_id, "chunk", "none", json.dumps(params))
             return f"Queued chunk as job {job}.", job_table(conn)
 
+        def on_queue_export(
+            books,
+            notes,
+            title_value,
+            slug_value,
+            domain_value,
+            choice,
+            uploaded,
+            pages_value,
+            section_labels,
+        ):
+            book_id = _book_id(
+                books, notes, title_value, slug_value, domain_value, choice, uploaded
+            )
+            _path, _first, _last, ranges = _selected_pages(
+                books, choice, uploaded, pages_value, section_labels
+            )
+            params = {
+                "page_ranges": ranges,
+                "sections": [label_to_title(label) for label in section_labels or []],
+            }
+            job = db.enqueue(conn, book_id, "export", "none", json.dumps(params))
+            root = export.export_root(slug_value.strip(), resolve_out_dir(notes))
+            return f"Queued export as job {job}; files go to {root}.", job_table(conn)
+
         def _queue_simple(
             stage,
             model_value,
@@ -475,6 +517,70 @@ def build() -> gr.Blocks:
                 job_table(conn),
             )
 
+        def on_run_no_llm(
+            books,
+            notes,
+            title_value,
+            slug_value,
+            domain_value,
+            choice,
+            uploaded,
+            pages_value,
+            section_labels,
+            ocr_value,
+        ):
+            """Queue everything that does not need a model.
+
+            Extraction first: the export links the figure crops it produces,
+            and without them the sections still come out, only with no
+            figures listed.
+            """
+            log.event(
+                "ui",
+                "run without a local LLM pressed",
+                title=title_value,
+                slug=slug_value,
+                domain=domain_value,
+                pages=pages_value,
+                sections=len(section_labels or []),
+            )
+            book_id = _book_id(
+                books, notes, title_value, slug_value, domain_value, choice, uploaded
+            )
+            _path, first, last, ranges = _selected_pages(
+                books, choice, uploaded, pages_value, section_labels
+            )
+            sections_chosen = [label_to_title(label) for label in section_labels or []]
+            queued = [
+                db.enqueue(
+                    conn,
+                    book_id,
+                    "extract",
+                    "none",
+                    json.dumps(
+                        {
+                            "first_page": first,
+                            "last_page": last,
+                            "ocr_langs": ocr_value,
+                        }
+                    ),
+                ),
+                db.enqueue(
+                    conn,
+                    book_id,
+                    "export",
+                    "none",
+                    json.dumps({"page_ranges": ranges, "sections": sections_chosen}),
+                ),
+            ]
+            root = export.export_root(slug_value.strip(), resolve_out_dir(notes))
+            return (
+                f"Queued jobs {queued[0]}-{queued[-1]} for pages {first}-{last}. "
+                f"No model is called. The files appear in {root}; hand "
+                "_PROMPT.md over once, then a section at a time.",
+                job_table(conn),
+            )
+
         def on_stop(job_id):
             return stop_jobs(conn, job_id), job_table(conn)
 
@@ -548,6 +654,21 @@ def build() -> gr.Blocks:
             [books_dir, notes_dir, title, slug, domain, source, upload],
             [status, jobs],
         )
+        queue_export.click(
+            on_queue_export,
+            [
+                books_dir,
+                notes_dir,
+                title,
+                slug,
+                domain,
+                source,
+                upload,
+                pages,
+                sections,
+            ],
+            [status, jobs],
+        )
         run_all.click(
             on_run_all,
             [
@@ -562,6 +683,22 @@ def build() -> gr.Blocks:
                 sections,
                 ocr,
                 model,
+            ],
+            [status, jobs],
+        )
+        run_no_llm.click(
+            on_run_no_llm,
+            [
+                books_dir,
+                notes_dir,
+                title,
+                slug,
+                domain,
+                source,
+                upload,
+                pages,
+                sections,
+                ocr,
             ],
             [status, jobs],
         )
