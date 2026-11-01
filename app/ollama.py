@@ -75,4 +75,9 @@ def generate(model: str, prompt: str, images: list[Path] | None = None) -> str:
     text = response["response"].strip()
     if not text:
         raise OllamaUnavailable(f"{model} returned an empty response")
+    if response.get("done_reason") == "length":
+        # Cut off at num_predict or at the end of the context window. The
+        # note would be missing its last sections, or the end of one, with
+        # nothing to show it: the chunk fails and is retried instead.
+        raise OllamaUnavailable(f"{model} stopped at its length limit")
     return text

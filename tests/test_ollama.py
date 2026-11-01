@@ -14,6 +14,7 @@ from app import config, ollama
 class FakeClient:
     def __init__(self, response: str = "text", models: list[str] | None = None) -> None:
         self.response = response
+        self.done_reason = "stop"
         self.models = models or []
         self.calls: list[dict] = []
 
@@ -22,7 +23,7 @@ class FakeClient:
 
     def generate(self, **kwargs: object) -> dict:
         self.calls.append(kwargs)
-        return {"response": self.response}
+        return {"response": self.response, "done_reason": self.done_reason}
 
 
 class BrokenClient:
@@ -99,3 +100,13 @@ def test_unload_never_raises(monkeypatch: pytest.MonkeyPatch) -> None:
     # A finished job must not be failed by a GPU that will free itself anyway.
     monkeypatch.setattr(ollama, "client", BrokenClient)
     ollama.unload("gemma3:12b-it-qat")
+
+
+def test_generate_rejects_a_response_cut_off_at_the_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = FakeClient(response="## In short\nhalf a note")
+    fake.done_reason = "length"
+    monkeypatch.setattr(ollama, "client", lambda: fake)
+    with pytest.raises(ollama.OllamaUnavailable, match="length limit"):
+        ollama.generate("gemma4:31b", "prompt")
