@@ -62,6 +62,16 @@ CHUNK_MAX_TOKENS: int = 6000
 EXPORT_MIN_TOKENS: int = int(os.environ.get("GLOSATOR_EXPORT_MIN_TOKENS", "12000"))
 EXPORT_MAX_TOKENS: int = int(os.environ.get("GLOSATOR_EXPORT_MAX_TOKENS", "20000"))
 
+# A page with this many lines ending in leader dots and a page number is a
+# table of contents. Its entries are headings with no text under them, so it
+# is left out of what the model reads. Index pages and part lists rarely
+# carry more than a couple of dotted lines.
+CONTENTS_PAGE_MIN_LINES: int = 5
+# The last page of a contents often holds only one or two entries under the
+# running head. It is still a contents page when its dotted lines are at least
+# this share of its characters.
+CONTENTS_PAGE_MIN_SHARE: float = 0.5
+
 # Rough token estimate for English and Polish technical prose. Only used to
 # decide merging, never to size a request exactly.
 CHARS_PER_TOKEN: int = 4

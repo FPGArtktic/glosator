@@ -469,3 +469,37 @@ def test_split_to_budget_honours_a_larger_ceiling(
         )
         == 1
     )
+
+
+CONTENTS_PAGE = "\n".join(
+    f"   1.{index} Section number {index} " + "." * 40 + f" {index * 3}"
+    for index in range(1, 9)
+)
+
+
+def test_a_contents_page_is_recognised() -> None:
+    assert chunk_module.is_contents_page(CONTENTS_PAGE)
+    assert not chunk_module.is_contents_page(RUNNING_HEAD_SAMPLE)
+
+
+def test_the_short_last_page_of_a_contents_is_recognised() -> None:
+    page = (
+        "Design Your Own Video Game Console\n"
+        "11.9.3 Switching Schemes and Added Features Via Cartridge"
+        + "." * 60
+        + " 829\n7\n"
+    )
+    assert chunk_module.is_contents_page(page)
+
+
+def test_one_dotted_line_on_a_page_of_text_is_not_a_contents() -> None:
+    page = "body text " * 100 + "\nTotal " + "." * 10 + " 42\n"
+    assert not chunk_module.is_contents_page(page)
+
+
+def test_readable_text_leaves_out_contents_pages(monkeypatch) -> None:
+    pages = {1: CONTENTS_PAGE, 2: "1.1 Analog Electronics\nbody text"}
+    monkeypatch.setattr(
+        chunk_module.pdf, "page_text", lambda _p, first, _last: pages[first]
+    )
+    assert chunk_module.readable_text(Path("/b.pdf"), 1, 2) == pages[2]

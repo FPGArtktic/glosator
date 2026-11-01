@@ -32,6 +32,7 @@ RUNNING_HEAD_RE = re.compile(
 )
 # Leader dots between a contents entry and its page number: "Ohm's Law .... 32".
 CONTENTS_LEADER_RE = re.compile(r"(?:\.\s?){4,}")
+CONTENTS_ENTRY_RE = re.compile(r"^[^\n]*?(?:\.\s?){4,}\s*\d{1,4}[ \t]*$", re.MULTILINE)
 CHUNKS_JSON = "chunks.json"
 EXPORT_CHUNKS_JSON = "chunks-export.json"
 
@@ -182,6 +183,28 @@ def identify(span: Span, text: str, order: int) -> tuple[int | None, str, str]:
     return span.chapter, f"{order:03d}", section_title(span.title)
 
 
+def is_contents_page(text: str) -> bool:
+    """True for a table of contents page, which has headings and no text."""
+    entries = [match.group(0) for match in CONTENTS_ENTRY_RE.finditer(text)]
+    if len(entries) >= config.CONTENTS_PAGE_MIN_LINES:
+        return True
+    dotted = sum(len(entry) for entry in entries)
+    return bool(entries) and dotted >= config.CONTENTS_PAGE_MIN_SHARE * len(text)
+
+
+def readable_text(pdf_path: Path, first_page: int, last_page: int) -> str:
+    """Text layer of a page range, without its contents pages.
+
+    A book that opens every chapter with its own contents puts several pages
+    of dotted headings into the first chunk of the chapter. The model reads
+    them as the subject of the note, and they cost the budget nothing useful.
+    """
+    pages = (
+        pdf.page_text(pdf_path, page, page) for page in range(first_page, last_page + 1)
+    )
+    return "\n\n".join(text for text in pages if not is_contents_page(text))
+
+
 def estimate_tokens(text: str) -> int:
     return len(text) // config.CHARS_PER_TOKEN
 
@@ -232,7 +255,7 @@ def split_to_budget(
     """
     ceiling = max_tokens if max_tokens is not None else config.CHUNK_MAX_TOKENS
     sizes = {
-        page: estimate_tokens(pdf.page_text(pdf_path, page, page))
+        page: estimate_tokens(readable_text(pdf_path, page, page))
         for page in range(first_page, last_page + 1)
     }
     slices: list[tuple[int, int]] = []
@@ -316,7 +339,7 @@ def span_text(book_slug: str, pdf_path: Path, span: Span) -> str:
         )
         if sliced:
             return sliced
-    return pdf.page_text(pdf_path, span.page_start, span.page_end)
+    return readable_text(pdf_path, span.page_start, span.page_end)
 
 
 def plan(
