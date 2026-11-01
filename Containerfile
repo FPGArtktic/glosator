@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.13.6 /uv /usr/local/bin/uv
 
 ENV UV_LINK_MODE=copy \
     PATH="/opt/venv/bin:$PATH" \
@@ -31,19 +31,22 @@ COPY pyproject.toml ./
 # 1.4 GB of weights. The stub package exists only so that the project's
 # dependencies can be resolved from pyproject before app/ is there.
 #
-# torch comes from the CPU index: docling is pinned to the CPU (the GPU
-# belongs to Ollama), so the CUDA wheels would be gigabytes of dead weight.
+# torch comes from the CUDA 12.8 index, the first whose wheels carry kernels
+# for Blackwell (compute capability 12.0, the RTX 5070 Ti). docling runs on
+# the card while Ollama holds nothing, and on the CPU otherwise; the CUDA
+# runtime arrives as nvidia-* wheels, so the base image needs none.
 #
 # The dev extra is installed so the image can run its own test suite:
 #   podman run --rm --network none -v .:/src:ro -w /src glosator:latest pytest
 RUN mkdir -p app && touch app/__init__.py \
     && uv venv /opt/venv \
     && uv pip install --python /opt/venv/bin/python \
-        --index-url https://download.pytorch.org/whl/cpu torch torchvision \
+        --index-url https://download.pytorch.org/whl/cu128 torch torchvision \
     && uv pip install --python /opt/venv/bin/python ".[dev]"
 
-# Bake docling's layout and table models into the image. The container has no
-# network at run time, so a model that is not here is a model we cannot use.
+# Bake docling's layout, table and formula models into the image. The
+# container has no network at run time, so a model that is not here is a
+# model we cannot use.
 #
 # The target directory is explicit: the default is $HOME/.cache/docling, and
 # with --userns=keep-id $HOME is not the one that existed at build time, which
