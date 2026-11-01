@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from app import chunk as chunk_module
-from app import config, log
+from app import config, extract, log
 from app.chunk import Chunk, Span
 from app.pdf import Bookmark
 
@@ -574,3 +574,35 @@ def test_plan_names_a_headless_chunk_after_the_section_it_continues(
         ("1.7", "Resistors"),
         ("1.7-2", "Resistors (continued)"),
     ]
+
+
+def test_readable_text_prefers_the_page_docling_extracted(monkeypatch) -> None:
+    layer = {1: "In this case,\n", 2: "text layer two"}
+    monkeypatch.setattr(
+        chunk_module.pdf, "page_text", lambda _p, first, _last: layer[first]
+    )
+    path = extract.page_markdown_path("bk1", 1)
+    path.parent.mkdir(parents=True)
+    path.write_text("In this case,\n\n$$V_{BE} < 0.6$$\n", encoding="utf-8")
+
+    text = chunk_module.readable_text(Path("/b.pdf"), 1, 2, "bk1")
+    assert text == "In this case,\n\n$$V_{BE} < 0.6$$\n\ntext layer two"
+
+
+def test_readable_text_drops_a_contents_page_docling_made_a_table(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        chunk_module.pdf, "page_text", lambda _p, _first, _last: CONTENTS_PAGE
+    )
+    path = extract.page_markdown_path("bk1", 1)
+    path.parent.mkdir(parents=True)
+    path.write_text("| 1.1 | Section | 3 |\n", encoding="utf-8")
+    assert chunk_module.readable_text(Path("/b.pdf"), 1, 1, "bk1") == ""
+
+
+def test_running_head_reads_a_markdown_heading() -> None:
+    assert chunk_module.running_head("## 1.4 Current & Voltage\nbody") == (
+        "1.4",
+        "Current & Voltage",
+    )

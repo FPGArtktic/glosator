@@ -27,7 +27,8 @@ SECTION_RE = re.compile(r"^\s*(\d+(?:\.\d+)*)\.?\s+(.*\S)\s*$")
 # printed page. It is the only section marker a book without usable bookmarks
 # still carries (see docs/DECISIONS.md).
 RUNNING_HEAD_RE = re.compile(
-    r"^[ \t\r]*(\d{1,2}\.\d{1,2})[ \t\r]+(\S[^\n]*?)[ \t\r]*(?:\d{1,4})?[ \t\r]*$",
+    r"^[ \t\r]*(?:#{1,6}[ \t]+)?"
+    r"(\d{1,2}\.\d{1,2})[ \t\r]+(\S[^\n]*?)[ \t\r]*(?:\d{1,4})?[ \t\r]*$",
     re.MULTILINE,
 )
 # Leader dots between a contents entry and its page number: "Ohm's Law .... 32".
@@ -240,17 +241,36 @@ def is_contents_page(text: str) -> bool:
     return bool(entries) and dotted >= config.CONTENTS_PAGE_MIN_SHARE * len(text)
 
 
-def readable_text(pdf_path: Path, first_page: int, last_page: int) -> str:
-    """Text layer of a page range, without its contents pages.
+def readable_text(
+    pdf_path: Path, first_page: int, last_page: int, book_slug: str | None = None
+) -> str:
+    """Text of a page range, without its contents pages.
+
+    A page docling extracted is read from its markdown: reading order across
+    columns, tables, and formulas as LaTeX, which the text layer either
+    scrambles or loses ("In this case," followed by nothing). A page it has
+    not extracted falls back to the text layer.
 
     A book that opens every chapter with its own contents puts several pages
     of dotted headings into the first chunk of the chapter. The model reads
     them as the subject of the note, and they cost the budget nothing useful.
+    The text layer decides that, because docling may turn a contents page
+    into a table that has no dotted lines left in it.
     """
-    pages = (
-        pdf.page_text(pdf_path, page, page) for page in range(first_page, last_page + 1)
-    )
-    return "\n\n".join(text for text in pages if not is_contents_page(text))
+    texts: list[str] = []
+    for page in range(first_page, last_page + 1):
+        layer = pdf.page_text(pdf_path, page, page)
+        if is_contents_page(layer):
+            continue
+        texts.append(_extracted_page(book_slug, page) or layer)
+    return "\n\n".join(texts)
+
+
+def _extracted_page(book_slug: str | None, page: int) -> str | None:
+    if book_slug is None:
+        return None
+    path = extract.page_markdown_path(book_slug, page)
+    return path.read_text(encoding="utf-8").strip() if path.exists() else None
 
 
 def estimate_tokens(text: str) -> int:
@@ -293,6 +313,7 @@ def split_to_budget(
     last_page: int,
     *,
     max_tokens: int | None = None,
+    book_slug: str | None = None,
 ) -> list[tuple[int, int]]:
     """Cut a page range into consecutive slices that fit the token budget.
 
@@ -303,7 +324,7 @@ def split_to_budget(
     """
     ceiling = max_tokens if max_tokens is not None else config.CHUNK_MAX_TOKENS
     sizes = {
-        page: estimate_tokens(readable_text(pdf_path, page, page))
+        page: estimate_tokens(readable_text(pdf_path, page, page, book_slug))
         for page in range(first_page, last_page + 1)
     }
     slices: list[tuple[int, int]] = []
@@ -387,7 +408,7 @@ def span_text(book_slug: str, pdf_path: Path, span: Span) -> str:
         )
         if sliced:
             return sliced
-    return readable_text(pdf_path, span.page_start, span.page_end)
+    return readable_text(pdf_path, span.page_start, span.page_end, book_slug)
 
 
 def plan(
@@ -409,7 +430,11 @@ def plan(
             )
             for first_page, last_page in page_ranges
             for start, end in split_to_budget(
-                pdf_path, first_page, last_page, max_tokens=sizes.max_tokens
+                pdf_path,
+                first_page,
+                last_page,
+                max_tokens=sizes.max_tokens,
+                book_slug=book_slug,
             )
         ]
     else:

@@ -496,3 +496,22 @@ which lives for the whole session and would keep whatever it put on the card.
 
 The image grows from about 5 GB to about 10 GB for the CUDA wheels. The unit
 gets the card through CDI, and the launcher refuses to start without a spec.
+
+## 2026-11-01 — Displayed formulas are recognised, and page ranges read docling's text
+
+Two halves of one fix. `docs/PILOT.md` traced one of the 32B model's two
+errors to the source text, not the model: the displayed inequality was gone
+and the sentence read "In this case," followed by nothing.
+
+docling's formula model (`do_formula_enrichment`) writes displayed formulas
+as LaTeX. It is on by default; `GLOSATOR_FORMULAS=0` turns it off for a book
+without mathematics, where it only costs time.
+
+That alone changed nothing, because page-range chunking never read docling's
+output. A chunk's text came from the chapter file only when a bookmark title
+matched a heading in it; a span named "pages 71-96" never matches, so every
+page-range chunk was read from the PDF's text layer. The extraction stage now
+writes docling's markdown per page (`pages/<nnnn>.md`) and chunking reads
+those, falling back to the text layer for a page that was not extracted.
+Whether a page is a table of contents is still decided from the text layer,
+because docling may turn a contents page into a table without dotted lines.
