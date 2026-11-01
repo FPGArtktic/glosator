@@ -42,6 +42,15 @@ established term, write: term — (brak odpowiednika)
 Mistakes or misconceptions the source warns about. Omit this whole section if
 the source warns about nothing.
 
+## Exercises
+Only when the source text contains exercises or review questions together
+with their answers. Each exercise is one item of a numbered list: the
+question on one line, then on the next line, indented by three spaces,
+"Answer:" and the answer the source gives. Shorten a long question or answer,
+but keep every command, option, path and value exactly as the source writes
+it. A question whose answer is not in the source text is left out: never
+answer one yourself. Omit this whole section if the source has no exercises.
+
 Hard rules. Each of these was broken by an earlier draft, and each broken one
 made a note that reads well and teaches something false:
 

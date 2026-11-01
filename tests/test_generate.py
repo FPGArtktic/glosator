@@ -84,6 +84,18 @@ def test_both_prompts_forbid_copying_a_garbled_formula(name: str) -> None:
     assert "0.707" in prompt
 
 
+def test_assemble_puts_exercises_last(chunk: Chunk) -> None:
+    sections = {
+        "Exercises": "1. Which command unloads a module?\n   Answer: modprobe -r",
+        "Pitfalls": "a",
+        "In short": "b",
+        "Explanation": "c",
+    }
+    note = generate.assemble(chunk, sections, "", "Book", "bk1", "gemma4:31b")
+    assert note.index("## Pitfalls") < note.index("## Exercises")
+    assert note.rstrip().endswith("Answer: modprobe -r")
+
+
 def test_split_sections_and_required_sections() -> None:
     sections = generate.split_sections(MODEL_OUTPUT)
     assert set(sections) == {

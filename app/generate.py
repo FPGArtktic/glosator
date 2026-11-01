@@ -51,6 +51,7 @@ SECTION_ORDER = (
     "Figures",
     "Glossary",
     "Pitfalls",
+    "Exercises",
 )
 REQUIRED_SECTIONS = ("In short", "Explanation")
 

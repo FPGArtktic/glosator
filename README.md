@@ -67,6 +67,10 @@ on either side of the folding frequency.*
 - A filter applied after sampling cannot undo aliasing, because the aliased
   component now occupies the same band as the signal.
 
+## Exercises
+1. A 30 kHz tone is sampled at 44.1 kHz. At what frequency does it appear?
+   Answer: at 14.1 kHz, its alias below half the sampling rate.
+
 ---
 [[4.06 Previous section]] · [[4.08 Next section]]
 ```

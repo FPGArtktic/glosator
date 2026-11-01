@@ -560,3 +560,25 @@ under 150 tokens (a title page, a topic's cover) are left out.
 
 Outlines like The Art of Electronics', numbered to the subsection, keep the
 span-per-bookmark plan.
+
+## 2026-11-01 — Exercises get their own optional section
+
+The first LPIC-1 run gave 85 notes and the exercises reached one of them.
+The LPI lessons end in "Guided Exercises", "Explorational Exercises" and an
+answer key, all inside the chunk, but the note contract had no place for
+them, so the model summarised the lesson and dropped the rest. For a book
+read to pass an exam, those questions are the part worth keeping.
+
+The contract gains `## Exercises`, after Pitfalls: a numbered list, each
+question with the answer the source gives. It is optional like Pitfalls, so
+a book without exercises gets the same notes as before, and a note written
+before this change is still a valid note: no migration. A question whose
+answer is not in the chunk is left out rather than answered by the model;
+the LPI answer keys repeat their questions, so a lesson split across two
+chunks loses nothing.
+
+`num_predict` goes from 2048 to 3072 for the extra section. The LPIC notes
+ran to 450–980 words without it, about 1300 tokens at most; with a list of
+answers on top, 2048 would cut notes off, and a cut note is now a failed
+chunk. 6000 tokens of chunk, about 1200 of prompt and 3072 out still fit the
+12288 context.
