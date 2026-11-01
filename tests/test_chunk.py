@@ -362,9 +362,9 @@ def test_split_to_budget_leaves_a_small_range_alone(monkeypatch) -> None:
 
 
 def test_split_to_budget_cuts_a_long_range_at_page_boundaries(monkeypatch) -> None:
-    # Every page is a third of the budget, so three pages fit and the fourth
-    # starts a new slice.
-    page = "x" * (config.CHUNK_MAX_TOKENS // 3 * config.CHARS_PER_TOKEN)
+    # Every page is a third of the budget less the joins, so three pages fit
+    # and the fourth starts a new slice.
+    page = "x" * (config.CHUNK_MAX_TOKENS // 3 * config.CHARS_PER_TOKEN - 8)
     monkeypatch.setattr(chunk_module.pdf, "page_text", lambda _p, _f, _l: page)
     assert chunk_module.split_to_budget(Path("/b.pdf"), 1, 7) == [
         (1, 3),
@@ -472,7 +472,7 @@ def test_the_export_budget_merges_further_than_the_note_budget() -> None:
 def test_split_to_budget_honours_a_larger_ceiling(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    page = "x" * (config.CHUNK_MAX_TOKENS * config.CHARS_PER_TOKEN)
+    page = "x" * (config.CHUNK_MAX_TOKENS * config.CHARS_PER_TOKEN - 8)
     monkeypatch.setattr(chunk_module.pdf, "page_text", lambda _p, _f, _l: page)
     pdf_path = Path("/nonexistent/book.pdf")
 
@@ -606,3 +606,13 @@ def test_running_head_reads_a_markdown_heading() -> None:
         "1.4",
         "Current & Voltage",
     )
+
+
+def test_split_to_budget_counts_the_separators_between_pages(monkeypatch) -> None:
+    # Three pages that fit only if the joins are left out of the count.
+    page = "x" * (config.CHUNK_MAX_TOKENS * config.CHARS_PER_TOKEN // 3)
+    monkeypatch.setattr(chunk_module.pdf, "page_text", lambda _p, _f, _l: page)
+    slices = chunk_module.split_to_budget(Path("/b.pdf"), 1, 3)
+    for first, last in slices:
+        joined = chunk_module.readable_text(Path("/b.pdf"), first, last)
+        assert chunk_module.estimate_tokens(joined) <= config.CHUNK_MAX_TOKENS

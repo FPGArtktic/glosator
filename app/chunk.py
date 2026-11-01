@@ -34,6 +34,7 @@ RUNNING_HEAD_RE = re.compile(
 # Leader dots between a contents entry and its page number: "Ohm's Law .... 32".
 CONTENTS_LEADER_RE = re.compile(r"(?:\.\s?){4,}")
 CONTENTS_ENTRY_RE = re.compile(r"^[^\n]*?(?:\.\s?){4,}\s*\d{1,4}[ \t]*$", re.MULTILINE)
+PAGE_SEPARATOR = "\n\n"
 CHUNKS_JSON = "chunks.json"
 EXPORT_CHUNKS_JSON = "chunks-export.json"
 
@@ -263,7 +264,7 @@ def readable_text(
         if is_contents_page(layer):
             continue
         texts.append(_extracted_page(book_slug, page) or layer)
-    return "\n\n".join(texts)
+    return PAGE_SEPARATOR.join(texts)
 
 
 def _extracted_page(book_slug: str | None, page: int) -> str | None:
@@ -323,14 +324,18 @@ def split_to_budget(
     refuses it.
     """
     ceiling = max_tokens if max_tokens is not None else config.CHUNK_MAX_TOKENS
-    sizes = {
-        page: estimate_tokens(readable_text(pdf_path, page, page, book_slug))
-        for page in range(first_page, last_page + 1)
-    }
+    # Measured in characters, as estimate_tokens measures the joined chunk,
+    # and with the separator each page adds to the join. Rounding every page
+    # down to whole tokens let a chunk of fifteen pages end 8 tokens over.
+    ceiling_chars = ceiling * config.CHARS_PER_TOKEN
+    sizes = {}
+    for page in range(first_page, last_page + 1):
+        text = readable_text(pdf_path, page, page, book_slug)
+        sizes[page] = len(text) + len(PAGE_SEPARATOR) if text else 0
     slices: list[tuple[int, int]] = []
     start, total = first_page, 0
     for page in range(first_page, last_page + 1):
-        if total and total + sizes[page] > ceiling:
+        if total and total + sizes[page] > ceiling_chars:
             slices.append((start, page - 1))
             start, total = page, 0
         total += sizes[page]
