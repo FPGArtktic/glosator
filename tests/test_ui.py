@@ -175,3 +175,10 @@ def test_last_note_ignores_the_export_tree(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     assert ui.last_note(tmp_path) == "_no notes yet_"
+
+
+def test_the_speed_choices_name_the_configured_text_models() -> None:
+    assert ui.SPEED_CHOICES == {
+        "quality": config.TEXT_MODEL,
+        "fast": config.FAST_TEXT_MODEL,
+    }

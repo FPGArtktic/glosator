@@ -26,6 +26,8 @@ from app import config, db, export, extract, generate, log, ollama, pdf
 
 WORKER_RESTART_S = 5.0
 JOB_COLUMNS = ["id", "stage", "status", "progress", "eta", "model", "error"]
+# The two text models the operator chooses between without typing a tag.
+SPEED_CHOICES = {"quality": config.TEXT_MODEL, "fast": config.FAST_TEXT_MODEL}
 
 
 def pdf_choices(books_dir: str | Path) -> list[str]:
@@ -232,8 +234,15 @@ def build() -> gr.Blocks:
                     label="or page ranges (e.g. 71-96, 100-104)", placeholder="71-96"
                 )
                 with gr.Row():
+                    speed = gr.Radio(
+                        list(SPEED_CHOICES),
+                        value="quality",
+                        label="Notes: quality or speed",
+                    )
                     model = gr.Dropdown(
-                        [config.TEXT_MODEL], value=config.TEXT_MODEL, label="Text model"
+                        list(dict.fromkeys(SPEED_CHOICES.values())),
+                        value=config.TEXT_MODEL,
+                        label="Text model",
                     )
                     vision_model = gr.Dropdown(
                         [config.VISION_MODEL],
@@ -339,6 +348,9 @@ def build() -> gr.Blocks:
             except ollama.OllamaUnavailable as error:
                 raise gr.Error(str(error)) from error
             return gr.update(choices=models), gr.update(choices=models)
+
+        def on_speed(choice):
+            return gr.update(value=SPEED_CHOICES[choice])
 
         def on_load_toc(books, choice, uploaded):
             path = resolve_pdf(books, choice, uploaded)
@@ -596,6 +608,7 @@ def build() -> gr.Blocks:
 
         refresh_pdfs.click(on_refresh_pdfs, books_dir, source)
         refresh_models.click(on_refresh_models, outputs=[model, vision_model])
+        speed.change(on_speed, speed, model)
         load_toc.click(on_load_toc, [books_dir, source, upload], [sections, status])
         preview_button.click(
             on_preview,
