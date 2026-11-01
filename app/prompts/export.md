@@ -74,10 +74,18 @@ that reads well and teaches something false. They are maintained in
 
 - Use only what the source text contains. State no fact that is not there. If
   the text refers to something outside it, write "(see section X)".
-- A formula must appear in the source. Copy it; do not reconstruct it from
-  memory, and do not add terms it does not have. If the source states no
-  formula, write "None in this section." An invented formula is the worst
-  thing this note can contain.
+- A formula must appear in the source. Do not reconstruct one from memory,
+  and do not add terms it does not have. If the source states no formula,
+  write "None in this section." An invented formula is the worst thing this
+  note can contain.
+- The formulas in the source were read off the page by a recognition model,
+  and some came out garbled: a square root that is not there, an exponent
+  where the page had a multiplication sign, "sin" where the text means Vin,
+  "I" read as "1" or "|". Copy a formula only when it reads as mathematics
+  and agrees with what the text around it says. When it does not, write the
+  formula that text states in words ("the product divided by their sum"),
+  or leave it out. Never copy a garbled formula. Keep every decimal point:
+  ".707" is 0.707, not 707.
 - Explain every symbol you use, where you use it. A formula whose symbols are
   undefined is worse than no formula.
 - A number belongs to the quantity the source attaches it to. Do not carry a

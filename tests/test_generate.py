@@ -75,6 +75,15 @@ def test_both_prompts_forbid_a_glossary_calque(name: str) -> None:
     assert "obszar zubożony" in prompt
 
 
+@pytest.mark.parametrize("name", ["note.md", "export.md"])
+def test_both_prompts_forbid_copying_a_garbled_formula(name: str) -> None:
+    # gemma4:31b copied recognised LaTeX verbatim: a square root in the
+    # parallel-resistor law, "sin" for Vin, 707 for .707.
+    prompt = generate.load_prompt(name)
+    assert "Never copy a garbled formula" in prompt
+    assert "0.707" in prompt
+
+
 def test_split_sections_and_required_sections() -> None:
     sections = generate.split_sections(MODEL_OUTPUT)
     assert set(sections) == {
