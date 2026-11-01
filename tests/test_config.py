@@ -93,7 +93,7 @@ def test_the_ollama_options_are_the_ones_claude_md_fixes() -> None:
     # which the text model was measured. See docs/DECISIONS.md, 2026-11-01.
     assert config.NUM_CTX == 12288
     assert config.TEMPERATURE == 0.25
-    assert config.NUM_PREDICT == 2048
+    assert config.NUM_PREDICT == 3072
 
 
 def test_the_chunk_budget_fits_inside_the_context_window() -> None:

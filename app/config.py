@@ -38,7 +38,7 @@ VISION_MODEL: str = os.environ.get("GLOSATOR_VISION_MODEL", "gemma4:26b")
 # Ollama request options, applied to every call (see CLAUDE.md).
 NUM_CTX: int = 12288
 TEMPERATURE: float = 0.25
-NUM_PREDICT: int = 2048
+NUM_PREDICT: int = 3072
 
 # A model partly offloaded to the CPU generates at a few tokens per second, so
 # a single chunk can legitimately take twenty minutes. Fail only on a real hang.
