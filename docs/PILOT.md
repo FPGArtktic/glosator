@@ -226,3 +226,109 @@ glosator vision --book bk1 --model qwen3-vl:8b --force
 ## 4. Decision
 
 Keep or drop the vision pass. Record the outcome in `docs/DECISIONS.md`.
+
+---
+
+## Measured on 2026-11-01 — RTX 5070 Ti, "Design Your Own Video Game Console"
+
+The laptop is gone. Machine: RTX 5070 Ti 16 GB (the desktop holds ~1.3 GB),
+Ryzen 7 7800X3D, 30 GB RAM. Ollama 0.40.13 on the host with
+`OLLAMA_FLASH_ATTENTION=1`, `OLLAMA_KV_CACHE_TYPE=q8_0`,
+`OLLAMA_MAX_LOADED_MODELS=1`. Options as always: `num_ctx` 12288, temperature
+0.25, `num_predict` 2048, `think: false`.
+
+Book: 919 pages, English, text layer throughout. The outline names only the
+eleven chapters; each chapter repeats the book's front matter and opens with
+its own contents. Chunked by page range, one range per chapter body.
+
+### Extraction
+
+| | card | CPU |
+|---|---|---|
+| 20 pages (79-98) | **43 s**, peak 4.7 GB | 124 s |
+| figures found | 17 | 17 |
+| whole book, 911 pages, 23 batches | **925 s**, peak 5.6 GB, no fallback | — |
+
+Formulas: docling's formula model kept the exponents the text layer drops
+("P = V^{2}/R" where the text layer has the 2 on a line of its own), but it
+reads this book's `*` multiplication into the exponent ("I^{2*}R") and now and
+then a whole formula is garbage ("\sqrt" in a product-over-sum, "sin" for Vin).
+
+915 pictures, of which 163 are the black callout tiles ("WARNING!", "TIP",
+"NOTE", "INTERESTING FACT"); they are now dropped (no caption, ≤ 80 pt wide).
+One pin table on page 751 came out at 36 kB of padding around 5 kB of
+content; table padding is now stripped.
+
+### Text — five chunks, two models
+
+First cut (chunks up to the budget, not aligned to sections). Each pair of
+notes was reviewed claim by claim against its chunk, one reviewer per chunk.
+
+| chunk | 31b s | 26b s | 31b errors | 26b errors | 31b bad glossary | 26b bad glossary |
+|---|---|---|---|---|---|---|
+| 1.7 discrete components | 126 | 30 | 2 | 2 | 2/12 | 0/15 |
+| 2.3 voltage dividers | 176 | 13 | 6, and 7 unreadable formulas | 0 | 1/10 | 1/15 |
+| 4.1 logic symbols | 152 | 19 | 1 | 0 | 5/12 | 2/18 |
+| 8.3 assembly language | 84 | 11 | 1 | 1 | 2/13 | 4/14 |
+| 9.4 6502 system | 87 | 15 | 0 | 4 | 1/13 | 3/14 |
+| **total** | **625** | **88** | **10** | **7** | **11/60** | **10/76** |
+
+Speed: 31b 9.6-11.6 tok/s output, 26b 92-107 tok/s, both at ~15.6 GB on the
+card. The prompt for chunk 9.4, code and pin tables, was 9488 tokens for a
+chunk estimated at 5922: such text runs under three characters a token.
+
+What the counts hide:
+
+- **Eight of 31b's ten errors are formulas copied from the recognised LaTeX**
+  as it stood: a square root in the parallel-resistor law, "sin/2" for Vin/2,
+  "V = 1·R", and ".707" written as 707. The prompt told it to copy formulas
+  and never reconstruct them, and it obeyed. 26b rewrote the same garbled
+  lines correctly — and elsewhere added facts the source does not state (a
+  cause for the 6502's reset vector, "TTL is faster", ceramic capacitors as
+  non-polarised).
+- **Coverage was poor for both**: a twelve-page chunk of several sections in a
+  note of at most 700 words leaves most of it out — worked examples, pin
+  numbers, threshold voltages, datasheet parameters.
+- Few notes had a Pitfalls section even where the source warns plainly.
+
+Changes made from this: the prompt now forbids copying a garbled formula and
+asks for the formula the surrounding text states; chunks end where a numbered
+section starts once they hold the minimum budget (77 → 87 chunks).
+
+### Vision — ten figures, three models
+
+`figure.md` prompt, one call per figure.
+
+| model | per figure | result |
+|---|---|---|
+| `qwen3-vl:8b` | 3-9 s | most detail; ".1uF" read as "1uF" twice, "R/W" as "R/D", a pull-up put in series |
+| `gemma4:26b` | 2-3 s | less detail, no wrong value seen; timing-diagram buses described as single lines |
+| `gemma4:31b` | 10-25 s | one empty answer, one CUDA OOM encoding the image; out |
+
+Decision: `gemma4:26b` (docs/DECISIONS.md).
+
+### Text — after the formula rule and section-aligned chunks
+
+`gemma4:31b` only, the same four subjects on the new chunk boundaries, the
+same review.
+
+| chunk | s | content errors | formulas wrong / artefacts only | bad glossary |
+|---|---|---|---|---|
+| 1.7 | 126 | 0 | 0 / 6 of 11 | 1/15 |
+| 2.3 | 84 | 0 | 0 / 5 of 6 | 0/8 |
+| 4.1 | 106 | 0 | 0 / 0 of 26 | 3/10 |
+| 9.4 | 107 | 1 | 0 / 0 of 3 | 2/10 |
+| **total** | **423** | **1 in ~140 claims** | **0 / 11 of 46** | **6/43** |
+
+From ten content errors on these subjects to one: an invented cause, the
+6502's reset vectors put at the top of memory "because it is little endian".
+No formula carries a wrong meaning any more; eleven still carry recognition
+artefacts that render legibly (`R1^{*}` for R1·R, `|` for I, digits spaced
+out, which LaTeX ignores). Two formulas are wrong in the book itself (the
+product-over-sum law for n resistors, a NAND chip select) and were copied
+without comment; no rule asks the model to correct its source, and none
+should.
+
+Still weak: worked numbers, tables and practical warnings are left out, and
+digital-logic glossary terms are calqued ("suma produktów" for sum of
+products).

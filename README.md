@@ -31,8 +31,8 @@ source: "Example Textbook, 1st ed."
 chapter: 4
 section: "4.07"
 pages: [212, 215]
-model: qwen2.5:32b
-generated: 2026-10-04
+model: gemma4:31b
+generated: 2026-11-01
 generator: glosator
 tags: [signal-processing, bk1, chapter-04]
 ---
@@ -85,19 +85,23 @@ why the body is not written in Polish instead.
 ## Requirements
 
 - Podman, rootless. Nothing is installed on the host.
-- [Ollama](https://ollama.com) with a text model, by default
-  `qwen2.5:32b`. A vision model, `qwen3-vl:8b`, is optional. A smaller
-  text model is a reasonable trade: see the comparison in `docs/PILOT.md`
-  before making it.
+- [Ollama](https://ollama.com) with a text model, by default `gemma4:31b`;
+  `gemma4:26b` is the fast choice in the interface, seven times faster for a
+  few more errors (`docs/DECISIONS.md`). The vision model is optional.
+  `OLLAMA_FLASH_ATTENTION=1` and `OLLAMA_KV_CACHE_TYPE=q8_0` on the Ollama
+  service halve the context's memory, which leaves more of the model on the
+  card; `OLLAMA_MAX_LOADED_MODELS=1` keeps it to one model at a time.
   Ollama normally listens on `127.0.0.1`, which a container cannot reach
   through an ordinary network, so the unit runs the container with
   `pasta --map-host-loopback` and points `OLLAMA_URL` at
   `host.containers.internal`. Nothing has to be changed on the Ollama side.
   To use an Ollama container instead, put both on a podman network and set
   `OLLAMA_URL` to that container's name.
-- A GPU is not required. The reference machine is a laptop with 4 GB of VRAM;
-  larger models run partly on the CPU, slowly, overnight. This is the design
-  point rather than a constraint to be worked around.
+- A GPU is not required, but it is used. The reference machine has an
+  RTX 5070 Ti with 16 GB. docling runs on the card when nvml reports it free
+  and on the CPU otherwise; the text model is larger than the card and runs
+  partly on the CPU. The container gets the card through CDI:
+  `sudo systemctl enable --now nvidia-cdi-refresh.path nvidia-cdi-refresh.service`.
 
 ## Quick start
 
@@ -209,8 +213,8 @@ because they are the same instructions every time: hand that over once, then
 a section file per note wanted.
 
 These files are cut larger than the ones the local model is given — 12 to 20
-thousand tokens rather than 3 to 6 — because nothing has to fit in 4 GB of
-VRAM at the other end. `GLOSATOR_EXPORT_MIN_TOKENS` and
+thousand tokens rather than 3 to 6 — because nothing has to fit in the local
+model's context window at the other end. `GLOSATOR_EXPORT_MIN_TOKENS` and
 `GLOSATOR_EXPORT_MAX_TOKENS` change that.
 
 The exported files carry `generator: glosator`, so the same safeguards below
@@ -281,9 +285,13 @@ Configuration is confined to `app/config.py` and the environment.
 | `GLOSATOR_IN` | `/in` | folder the books are read from, mounted read-only |
 | `GLOSATOR_OUT` | `/out` | folder the notes are written to |
 | `OLLAMA_URL` | `http://ollama:11434` | address of the Ollama instance |
-| `GLOSATOR_TEXT_MODEL` | `qwen2.5:32b` | model used for the text pass |
-| `GLOSATOR_VISION_MODEL` | `qwen3-vl:8b` | model used for the figure pass |
+| `GLOSATOR_TEXT_MODEL` | `gemma4:31b` | model used for the text pass |
+| `GLOSATOR_FAST_MODEL` | `gemma4:26b` | the interface's "fast" choice |
+| `GLOSATOR_VISION_MODEL` | `gemma4:26b` | model used for the figure pass |
 | `GLOSATOR_OCR_LANGS` | `pol+eng` | tesseract languages |
+| `GLOSATOR_DOCLING_DEVICE` | `auto` | `auto`, `cuda` or `cpu` for the extraction |
+| `GLOSATOR_EXTRACT_MIN_FREE_MB` | `6000` | free VRAM `auto` needs before using the card |
+| `GLOSATOR_FORMULAS` | `1` | `0` turns off formula recognition |
 | `GLOSATOR_DOMAIN` | `general` | subject assumed for a book that specifies none |
 | `GLOSATOR_EXPORT_MIN_TOKENS` | `12000` | smallest export file, in tokens of source |
 | `GLOSATOR_EXPORT_MAX_TOKENS` | `20000` | largest export file, in tokens of source |
