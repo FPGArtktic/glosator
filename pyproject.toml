@@ -9,6 +9,7 @@ authors = [{ name = "Mateusz Okulanis", email = "109816464+FPGArtktic@users.nore
 dependencies = [
     "docling>=2.0",
     "gradio>=4.44",
+    "nvidia-ml-py>=12.0",  # is the card free before docling asks for it
     "ollama>=0.5",  # the think field: gemma4 thinks unless told not to
     "pillow>=10.0",
     "pypdfium2>=5.0",  # the v5 outline API: PdfBookmark.get_dest()

@@ -83,10 +83,24 @@ DEFAULT_DOMAIN: str = os.environ.get("GLOSATOR_DOMAIN", "general")
 
 OCR_LANGS: str = os.environ.get("GLOSATOR_OCR_LANGS", "pol+eng")
 
-# docling runs on the CPU. The GPU holds one model at a time and that model is
-# Ollama's: a layout pass that competes with it dies of CUDA OOM, and the
-# extraction stage is minutes against the generation stage's hours.
+# Where docling runs: "auto" puts it on the card when nvml reports at least
+# EXTRACT_MIN_FREE_MB free, which it does only while Ollama holds no model;
+# "cpu" and "cuda" force the choice. The stages run one after another, so the
+# card is the extraction stage's while it runs and Ollama's afterwards.
+DOCLING_DEVICE: str = os.environ.get("GLOSATOR_DOCLING_DEVICE", "auto")
+# Layout, table and formula models together, with headroom. A layout pass
+# that ran short of memory once dropped half the figures without failing
+# (docs/PILOT.md), so the bar is set well above what they need.
+EXTRACT_MIN_FREE_MB: int = int(os.environ.get("GLOSATOR_EXTRACT_MIN_FREE_MB", "6000"))
 DOCLING_THREADS: int = int(os.environ.get("GLOSATOR_DOCLING_THREADS", "8"))
+
+# Pages per docling run. Each batch is a child process that exits when done,
+# which is what returns its memory to the system and its VRAM to the card, and
+# a finished batch is kept, so a stopped extraction resumes where it was.
+EXTRACT_BATCH_PAGES: int = 40
+# One batch on the CPU with OCR is minutes per page at worst. An hour without
+# an answer is a hang.
+EXTRACT_BATCH_TIMEOUT_S: int = 3600
 
 # Where the image bakes docling's weights. Passing the path explicitly is what
 # makes the offline container work: docling's own default lives under $HOME,

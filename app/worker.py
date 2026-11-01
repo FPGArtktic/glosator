@@ -46,6 +46,9 @@ def main() -> None:
 def _stop(_signum: int, _frame: object) -> None:
     global _running
     _running = False
+    # An extraction batch runs in a child that would otherwise finish its
+    # forty pages on the card after the worker was told to stop.
+    extract.kill_active_child()
 
 
 def _run_job(conn: sqlite3.Connection, job: sqlite3.Row) -> None:
@@ -126,6 +129,7 @@ def _do_extract(conn: sqlite3.Connection, job: sqlite3.Row) -> None:
         params["first_page"],
         params["last_page"],
         params.get("ocr_langs", config.OCR_LANGS),
+        force=bool(params.get("force")),
     )
     db.job_progress(conn, job["id"], 1, 1)
     db.stage_finish(

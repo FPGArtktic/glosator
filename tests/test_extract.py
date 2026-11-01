@@ -4,9 +4,13 @@
 
 from __future__ import annotations
 
+import json
+import subprocess
+from pathlib import Path
+
 import pytest
 
-from app import extract
+from app import config, extract
 
 
 def test_slugify_folds_polish_diacritics() -> None:
@@ -106,3 +110,173 @@ def test_bbox_to_pixels_top_left_origin_and_padding() -> None:
 
 def test_load_figures_without_file(tmp_path) -> None:
     assert extract.load_figures("missing-book") == []
+
+
+def test_batches_cover_the_range_without_overlap() -> None:
+    assert extract.batches(9, 100, size=40) == [(9, 48), (49, 88), (89, 100)]
+    assert extract.batches(5, 5, size=40) == [(5, 5)]
+
+
+def _fake_child(calls: list[tuple[int, int]]):
+    """Stands in for the docling child: one page file and one figure per batch."""
+
+    def run_child(book_slug: str, _pdf: Path, settings: dict) -> dict:
+        first, last = settings["pages"]
+        calls.append((first, last))
+        for page in range(first, last + 1):
+            path = extract.page_markdown_path(book_slug, page)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(f"page {page}\n", encoding="utf-8")
+        figure = extract.Figure(
+            id=f"fig-{first}-{settings['figure_offset'] + 1}",
+            page=first,
+            bbox=(0.0, 0.0, 1.0, 1.0),
+            caption="",
+            heading=settings["heading"] or f"heading {first}",
+            path=f"figures/fig-{first}.png",
+        )
+        record = {
+            "settings": settings,
+            "device": "cpu",
+            "ocr_pages": [],
+            "figures": [extract.asdict(figure)],
+            "last_heading": f"heading {first}",
+        }
+        batch = extract._batch_path(config.WORK_DIR / book_slug, settings)
+        extract._write_json(batch, record)
+        return record
+
+    return run_child
+
+
+def test_run_numbers_figures_through_every_batch(monkeypatch) -> None:
+    calls: list[tuple[int, int]] = []
+    monkeypatch.setattr(config, "EXTRACT_BATCH_PAGES", 2)
+    monkeypatch.setattr(extract, "_run_batch_child", _fake_child(calls))
+
+    result = extract.run("bk", Path("/b.pdf"), 1, 5)
+
+    assert calls == [(1, 2), (3, 4), (5, 5)]
+    assert [figure.id for figure in result.figures] == [
+        "fig-1-1",
+        "fig-3-2",
+        "fig-5-3",
+    ]
+    # A batch's first figure belongs to the heading the batch before ended on.
+    assert result.figures[1].heading == "heading 1"
+    assert "page 3" in result.chapter_files[0].read_text(encoding="utf-8")
+    assert len(extract.load_figures("bk")) == 3
+
+
+def test_run_resumes_from_the_batches_already_done(monkeypatch) -> None:
+    calls: list[tuple[int, int]] = []
+    monkeypatch.setattr(config, "EXTRACT_BATCH_PAGES", 2)
+    monkeypatch.setattr(extract, "_run_batch_child", _fake_child(calls))
+    extract.run("bk", Path("/b.pdf"), 1, 4)
+    calls.clear()
+
+    extract.run("bk", Path("/b.pdf"), 1, 4)
+    assert calls == []
+
+    extract.run("bk", Path("/b.pdf"), 1, 4, force=True)
+    assert calls == [(1, 2), (3, 4)]
+
+
+def test_a_batch_made_with_other_settings_is_not_reused(monkeypatch) -> None:
+    calls: list[tuple[int, int]] = []
+    monkeypatch.setattr(config, "EXTRACT_BATCH_PAGES", 2)
+    monkeypatch.setattr(extract, "_run_batch_child", _fake_child(calls))
+    extract.run("bk", Path("/b.pdf"), 1, 2, ocr_langs="eng")
+    calls.clear()
+
+    extract.run("bk", Path("/b.pdf"), 1, 2, ocr_langs="pol")
+    assert calls == [(1, 2)]
+
+
+@pytest.mark.parametrize("setting", ["cpu", "cuda"])
+def test_a_forced_device_is_used_as_given(setting: str, monkeypatch) -> None:
+    monkeypatch.setattr(extract, "gpu_free_mb", lambda: pytest.fail("asked nvml"))
+    assert extract.choose_device(setting)[0] == setting
+
+
+@pytest.mark.parametrize(
+    ("free", "device"),
+    [(None, "cpu"), (1000, "cpu"), (config.EXTRACT_MIN_FREE_MB, "cuda")],
+)
+def test_auto_takes_the_card_only_when_it_is_free(free, device, monkeypatch) -> None:
+    monkeypatch.setattr(extract, "gpu_free_mb", lambda: free)
+    assert extract.choose_device("auto")[0] == device
+
+
+def test_a_failed_gpu_conversion_is_redone_on_the_cpu(monkeypatch) -> None:
+    devices: list[str] = []
+
+    def convert(_pdf, _first, _last, _langs, _ocr, device):
+        devices.append(device)
+        if device == "cuda":
+            raise extract.ExtractionIncomplete("Stage layout failed")
+        return "document"
+
+    monkeypatch.setattr(extract, "choose_device", lambda: ("cuda", "free"))
+    monkeypatch.setattr(extract, "_convert", convert)
+
+    assert extract._convert_on_best_device(Path("/b.pdf"), 1, 2, "eng", False) == (
+        "document",
+        "cpu",
+    )
+    assert devices == ["cuda", "cpu"]
+
+
+def test_a_failed_cpu_conversion_is_not_hidden(monkeypatch) -> None:
+    def convert(*_args):
+        raise extract.ExtractionIncomplete("page failed")
+
+    monkeypatch.setattr(extract, "choose_device", lambda: ("cpu", "no card"))
+    monkeypatch.setattr(extract, "_convert", convert)
+    with pytest.raises(extract.ExtractionIncomplete):
+        extract._convert_on_best_device(Path("/b.pdf"), 1, 2, "eng", False)
+
+
+def test_the_preview_never_touches_the_card(monkeypatch) -> None:
+    class Document:
+        def export_to_markdown(self) -> str:
+            return "text"
+
+    devices: list[str] = []
+
+    def convert(*args):
+        devices.append(args[-1])
+        return Document()
+
+    monkeypatch.setattr(extract.pdf, "page_count", lambda _path: 10)
+    monkeypatch.setattr(extract, "pages_needing_ocr", lambda *_args: [])
+    monkeypatch.setattr(extract, "_convert", convert)
+    assert extract.preview(Path("/b.pdf"), 1) == "text"
+    assert devices == ["cpu"]
+
+
+def test_a_failing_child_reports_its_last_words(monkeypatch) -> None:
+    class Child:
+        returncode = 1
+
+        def __init__(self, *_args, **_kwargs) -> None:
+            pass
+
+        def communicate(self, timeout: int):
+            return b"", b"Traceback\nRuntimeError: CUDA error: no kernel image\n"
+
+    monkeypatch.setattr(subprocess, "Popen", Child)
+    settings = extract._batch_settings(1, 2, "eng", 0, "")
+    with pytest.raises(RuntimeError, match="no kernel image"):
+        extract._run_batch_child("bk", Path("/b.pdf"), settings)
+
+
+def test_the_child_entry_point_runs_one_batch(monkeypatch) -> None:
+    seen: list[tuple] = []
+    monkeypatch.setattr(extract, "extract_batch", lambda *args: seen.append(args) or {})
+    settings = extract._batch_settings(3, 4, "eng", 0, "")
+    code = extract.main(
+        ["--book", "bk", "--pdf", "/b.pdf", "--settings", json.dumps(settings)]
+    )
+    assert code == 0
+    assert seen == [("bk", Path("/b.pdf"), settings)]

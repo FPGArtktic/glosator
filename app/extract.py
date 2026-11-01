@@ -4,14 +4,23 @@
 
 Output under ``work/<book>/``:
   ``<nn>-<chapter>.md``  one file per top-level heading in the page range
+  ``pages/<nnnn>.md``    docling's markdown for one page
   ``figures/*.png``      one crop per picture docling found
   ``figures.json``       bbox, page, caption and owning heading per crop
+  ``batches/*.json``     what each docling run produced, for resuming
 """
 
 from __future__ import annotations
 
+import argparse
+import contextlib
+import ctypes
 import json
+import os
 import re
+import signal
+import subprocess
+import sys
 import unicodedata
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -26,6 +35,12 @@ CHAPTER_HEADING_RE = re.compile(
     r"\s*(?:chapter|rozdzia[lł])?\s*(\d{1,2})(?!\s*\.\s*\d)\b", re.IGNORECASE
 )
 FIGURES_JSON = "figures.json"
+PAGES_DIR = "pages"
+BATCHES_DIR = "batches"
+# Bumped when what a batch writes changes, so older batches are not reused.
+BATCH_FORMAT = 1
+# From <linux/prctl.h>: deliver a signal to this process when its parent dies.
+PR_SET_PDEATHSIG = 1
 
 # NFKD decomposes ą, ć, ę, ń, ó, ś, ź and ż into a plain letter plus a
 # combining mark, which the ASCII encode in slugify then drops. It does not
@@ -159,46 +174,312 @@ def bbox_to_pixels(
     return tuple(max(0, round(value)) for value in box)  # type: ignore[return-value]
 
 
+def batches(
+    first_page: int, last_page: int, size: int | None = None
+) -> list[tuple[int, int]]:
+    """Consecutive page ranges of at most ``size`` pages covering the range."""
+    step = size or config.EXTRACT_BATCH_PAGES
+    return [
+        (start, min(start + step - 1, last_page))
+        for start in range(first_page, last_page + 1, step)
+    ]
+
+
+def page_markdown_path(book_slug: str, page: int) -> Path:
+    """docling's markdown for one page, which chunking reads by page range."""
+    return config.WORK_DIR / book_slug / PAGES_DIR / f"{page:04d}.md"
+
+
 def run(
     book_slug: str,
     pdf_path: Path,
     first_page: int,
     last_page: int,
     ocr_langs: str = config.OCR_LANGS,
+    *,
+    force: bool = False,
 ) -> ExtractResult:
-    """Extract a page range. Overwrites previous output for the same book."""
+    """Extract a page range, batch by batch, each batch in a child process.
+
+    A batch extracted earlier with the same settings is reused unless
+    ``force``, so a stopped extraction of a long book resumes instead of
+    starting over. The chapter files and ``figures.json`` are rewritten from
+    all batches at the end.
+    """
     book_dir = config.WORK_DIR / book_slug
     (book_dir / "figures").mkdir(parents=True, exist_ok=True)
+    log.event("extract", "starting", book=book_slug, pages=[first_page, last_page])
 
-    ocr_pages = pages_needing_ocr(pdf_path, first_page, last_page)
-    log.event(
-        "extract",
-        "starting",
-        book=book_slug,
-        pages=[first_page, last_page],
-        ocr_pages=len(ocr_pages),
+    figures: list[Figure] = []
+    ocr_pages: list[int] = []
+    heading = ""
+    for start, end in batches(first_page, last_page):
+        wanted = _batch_settings(start, end, ocr_langs, len(figures), heading)
+        record = None if force else _reusable_batch(book_dir, wanted)
+        if record is None:
+            record = _run_batch_child(book_slug, pdf_path, wanted)
+        figures += [_figure(entry) for entry in record["figures"]]
+        ocr_pages += record["ocr_pages"]
+        heading = record["last_heading"]
+
+    markdown = "\n\n".join(
+        page_markdown_path(book_slug, page).read_text(encoding="utf-8")
+        for page in range(first_page, last_page + 1)
     )
-
-    document = _convert(pdf_path, first_page, last_page, ocr_langs, bool(ocr_pages))
-    markdown = document.export_to_markdown()
-
     chapter_files = _write_chapters(book_dir, markdown, first_page, last_page)
-    figures = _write_figures(book_dir, pdf_path, document)
-    (book_dir / FIGURES_JSON).write_text(
-        json.dumps(
-            [asdict(figure) for figure in figures], ensure_ascii=False, indent=2
-        ),
-        encoding="utf-8",
-    )
-
+    _write_json(book_dir / FIGURES_JSON, [asdict(figure) for figure in figures])
     log.event(
         "extract",
         "done",
         book=book_slug,
         chapters=len(chapter_files),
         figures=len(figures),
+        ocr_pages=len(ocr_pages),
     )
     return ExtractResult(book_dir, chapter_files, figures, ocr_pages)
+
+
+def _batch_settings(
+    first_page: int, last_page: int, ocr_langs: str, figure_offset: int, heading: str
+) -> dict[str, object]:
+    """Everything a batch's output depends on. A batch is reused only on a match.
+
+    The figure offset and the heading carried in from the batch before are
+    part of it: figure ids count through the whole range, and a figure before
+    the first heading of a batch belongs to the last heading of the previous.
+    """
+    return {
+        "format": BATCH_FORMAT,
+        "pages": [first_page, last_page],
+        "ocr_langs": ocr_langs,
+        "figure_offset": figure_offset,
+        "heading": heading,
+    }
+
+
+def _batch_path(book_dir: Path, settings: dict[str, object]) -> Path:
+    first_page, last_page = settings["pages"]  # type: ignore[misc]
+    return book_dir / BATCHES_DIR / f"{first_page:04d}-{last_page:04d}.json"
+
+
+def _reusable_batch(book_dir: Path, wanted: dict[str, object]) -> dict | None:
+    path = _batch_path(book_dir, wanted)
+    if not path.exists():
+        return None
+    record = json.loads(path.read_text(encoding="utf-8"))
+    if record.get("settings") != wanted:
+        return None
+    log.event("extract", "batch reused", pages=wanted["pages"])
+    return record
+
+
+def _figure(entry: dict) -> Figure:
+    return Figure(**{**entry, "bbox": tuple(entry["bbox"])})
+
+
+# The batch child currently running, so that a worker being stopped takes it
+# with it instead of leaving it holding the card.
+_child: subprocess.Popen | None = None
+
+
+def kill_active_child() -> None:
+    """Kill the extraction child, if one is running. For the worker's SIGTERM."""
+    process = _child
+    if process is not None and process.poll() is None:
+        process.kill()
+        log.event("extract", "extraction child killed")
+
+
+def _run_batch_child(
+    book_slug: str, pdf_path: Path, settings: dict[str, object]
+) -> dict:
+    """Extract one batch in a child process and read back what it wrote.
+
+    docling's models stay in the process that loaded them, and torch keeps a
+    caching allocator on the card: freeing the converter hands its memory back
+    to that cache, not to the driver. The worker outlives the stage and goes
+    on to the generate job, whose Ollama model would find the card still half
+    taken. Process exit is the only thing that returns device memory
+    unconditionally, so every batch runs in a child that writes its record
+    and exits. tachygraf learned the same about its ASR stage.
+    """
+    global _child
+    first_page, last_page = settings["pages"]  # type: ignore[misc]
+    argv = [
+        sys.executable,
+        "-m",
+        "app.extract",
+        "--book",
+        book_slug,
+        "--pdf",
+        str(pdf_path),
+        "--settings",
+        json.dumps(settings),
+    ]
+    log.event("extract", "starting a batch", pages=[first_page, last_page])
+    try:
+        _child = subprocess.Popen(
+            argv,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            preexec_fn=_die_with_parent,
+        )
+        _stdout, stderr = _child.communicate(timeout=config.EXTRACT_BATCH_TIMEOUT_S)
+        code = _child.returncode
+    except subprocess.TimeoutExpired as error:
+        kill_active_child()
+        raise RuntimeError(
+            f"pages {first_page}-{last_page} did not finish within "
+            f"{config.EXTRACT_BATCH_TIMEOUT_S} s"
+        ) from error
+    finally:
+        _child = None
+
+    if code != 0:
+        # The child logs to the same file; this is what reaches the job row.
+        tail = (stderr or b"").decode("utf-8", errors="replace").strip()
+        last = tail.splitlines()[-1] if tail else "no output"
+        raise RuntimeError(f"pages {first_page}-{last_page} failed ({code}): {last}")
+    book_dir = config.WORK_DIR / book_slug
+    return json.loads(_batch_path(book_dir, settings).read_text(encoding="utf-8"))
+
+
+def _die_with_parent() -> None:
+    """Have the kernel kill the child when the worker dies, however it dies.
+
+    "Stop now" ends the worker; a child left behind would keep a GPU and a
+    docling run nobody is waiting for. Linux only, as the container is.
+    """
+    libc = ctypes.CDLL("libc.so.6", use_errno=True)
+    libc.prctl(PR_SET_PDEATHSIG, signal.SIGKILL)
+
+
+def extract_batch(book_slug: str, pdf_path: Path, settings: dict[str, object]) -> dict:
+    """The child's whole job: one docling run, its pages, its figures, its record."""
+    first_page, last_page = settings["pages"]  # type: ignore[misc]
+    book_dir = config.WORK_DIR / book_slug
+    ocr_pages = pages_needing_ocr(pdf_path, first_page, last_page)
+    document, device = _convert_on_best_device(
+        pdf_path, first_page, last_page, str(settings["ocr_langs"]), bool(ocr_pages)
+    )
+    _write_pages(book_slug, document, first_page, last_page)
+    figures, last_heading = _write_figures(
+        book_dir,
+        pdf_path,
+        document,
+        figure_offset=int(settings["figure_offset"]),  # type: ignore[arg-type]
+        heading=str(settings["heading"]),
+    )
+    record = {
+        "settings": settings,
+        "device": device,
+        "ocr_pages": ocr_pages,
+        "figures": [asdict(figure) for figure in figures],
+        "last_heading": last_heading,
+    }
+    _write_json(_batch_path(book_dir, settings), record)
+    log.event(
+        "extract",
+        "batch done",
+        pages=[first_page, last_page],
+        device=device,
+        figures=len(figures),
+    )
+    return record
+
+
+def gpu_free_mb() -> int | None:
+    """Free VRAM on the first card, or ``None`` when the card cannot be asked.
+
+    ``None`` is not zero: it means nvml was not there to answer, which is also
+    what a host without an NVIDIA card looks like. Both mean the CPU.
+    """
+    try:
+        import pynvml
+    except ImportError:
+        return None
+    try:
+        pynvml.nvmlInit()
+    except Exception as error:  # no driver, no CDI spec, no card
+        log.event("extract", "nvml unavailable", error=repr(error))
+        return None
+    try:
+        handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+        return int(pynvml.nvmlDeviceGetMemoryInfo(handle).free // 1_000_000)
+    except Exception as error:
+        log.event("extract", "could not read VRAM", error=repr(error))
+        return None
+    finally:
+        # Failing to shut nvml down cannot be allowed to fail a job.
+        with contextlib.suppress(Exception):
+            pynvml.nvmlShutdown()
+
+
+def choose_device(setting: str = config.DOCLING_DEVICE) -> tuple[str, str]:
+    """``(device, reason)`` for docling: ``"cuda"`` or ``"cpu"``.
+
+    The CPU is a correct answer, not a failure: it is what a card still held
+    by Ollama gets, and the extraction is slower there, not worse.
+    """
+    if setting in ("cpu", "cuda"):
+        return setting, f"GLOSATOR_DOCLING_DEVICE={setting}"
+    free = gpu_free_mb()
+    if free is None:
+        return "cpu", "no usable NVIDIA card was found"
+    if free < config.EXTRACT_MIN_FREE_MB:
+        return (
+            "cpu",
+            f"{free} MB of VRAM is free and extraction needs "
+            f"{config.EXTRACT_MIN_FREE_MB} MB",
+        )
+    return "cuda", f"{free} MB of VRAM is free"
+
+
+def _convert_on_best_device(
+    pdf_path: Path, first_page: int, last_page: int, ocr_langs: str, do_ocr: bool
+):
+    """Convert on the card if it is free, on the CPU if it is not or if it fails.
+
+    nvml answering "free" is not a promise, and docling on a card that runs
+    short does not raise: it logs "Stage layout failed" and returns half the
+    figures. _convert turns that into an exception, which is what sends the
+    batch to the CPU here instead of into the notes.
+    """
+    device, reason = choose_device()
+    log.event("extract", "device chosen", device=device, reason=reason)
+    try:
+        return _convert(
+            pdf_path, first_page, last_page, ocr_langs, do_ocr, device
+        ), device
+    except Exception as error:
+        if device == "cpu":
+            raise
+        log.event(
+            "extract",
+            "the GPU attempt failed; falling back to the CPU",
+            pages=[first_page, last_page],
+            error=repr(error),
+        )
+    return _convert(pdf_path, first_page, last_page, ocr_langs, do_ocr, "cpu"), "cpu"
+
+
+def _write_pages(book_slug: str, document, first_page: int, last_page: int) -> None:
+    for page in range(first_page, last_page + 1):
+        path = page_markdown_path(book_slug, page)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _write_text(path, document.export_to_markdown(page_no=page).strip() + "\n")
+
+
+def _write_json(path: Path, payload: object) -> None:
+    _write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+
+
+def _write_text(path: Path, text: str) -> None:
+    """Through a temporary file and a rename, so a killed batch leaves no half file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.tmp")
+    temporary.write_text(text, encoding="utf-8")
+    os.replace(temporary, path)
 
 
 def preview(
@@ -207,22 +488,35 @@ def preview(
     ocr_langs: str = config.OCR_LANGS,
     pages: int = config.PREVIEW_PAGES,
 ) -> str:
-    """Markdown of a few pages, for the UI's pre-flight check."""
+    """Markdown of a few pages, for the UI's pre-flight check.
+
+    Always on the CPU: this runs in the interface's own process, which lives
+    for the whole session and would keep whatever it put on the card.
+    """
     last_page = min(first_page + pages - 1, pdf.page_count(pdf_path))
     needs_ocr = bool(pages_needing_ocr(pdf_path, first_page, last_page))
-    document = _convert(pdf_path, first_page, last_page, ocr_langs, needs_ocr)
+    document = _convert(pdf_path, first_page, last_page, ocr_langs, needs_ocr, "cpu")
     return document.export_to_markdown()
 
 
+class ExtractionIncomplete(RuntimeError):
+    """docling returned a document but reported that part of it failed."""
+
+
 def _convert(
-    pdf_path: Path, first_page: int, last_page: int, ocr_langs: str, do_ocr: bool
+    pdf_path: Path,
+    first_page: int,
+    last_page: int,
+    ocr_langs: str,
+    do_ocr: bool,
+    device: str,
 ):
     """The only place that talks to docling. Keep version churn contained here."""
     from docling.datamodel.accelerator_options import (
         AcceleratorDevice,
         AcceleratorOptions,
     )
-    from docling.datamodel.base_models import InputFormat
+    from docling.datamodel.base_models import ConversionStatus, InputFormat
     from docling.datamodel.pipeline_options import (
         PdfPipelineOptions,
         TesseractCliOcrOptions,
@@ -233,7 +527,8 @@ def _convert(
     if config.DOCLING_MODELS.is_dir():
         options.artifacts_path = config.DOCLING_MODELS
     options.accelerator_options = AcceleratorOptions(
-        device=AcceleratorDevice.CPU, num_threads=config.DOCLING_THREADS
+        device=AcceleratorDevice.CUDA if device == "cuda" else AcceleratorDevice.CPU,
+        num_threads=config.DOCLING_THREADS,
     )
     options.do_ocr = do_ocr
     options.do_table_structure = True
@@ -246,7 +541,16 @@ def _convert(
     converter = DocumentConverter(
         format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=options)}
     )
-    result = converter.convert(pdf_path, page_range=(first_page, last_page))
+    result = converter.convert(
+        pdf_path, page_range=(first_page, last_page), raises_on_error=False
+    )
+    if result.status != ConversionStatus.SUCCESS:
+        # A partial result is the silent half-extraction docs/PILOT.md records:
+        # figures missing from the notes with nothing in the log but a warning.
+        errors = "; ".join(str(error.error_message) for error in result.errors)
+        raise ExtractionIncomplete(
+            f"pages {first_page}-{last_page} on {device}: {result.status}: {errors}"
+        )
     return result.document
 
 
@@ -270,10 +574,20 @@ def _write_chapters(
     return written
 
 
-def _write_figures(book_dir: Path, pdf_path: Path, document) -> list[Figure]:
-    """Crop every picture docling located into ``figures/``."""
+def _write_figures(
+    book_dir: Path,
+    pdf_path: Path,
+    document,
+    *,
+    figure_offset: int = 0,
+    heading: str = "",
+) -> tuple[list[Figure], str]:
+    """Crop every picture docling located into ``figures/``.
+
+    Returns the figures and the last heading seen, which the next batch's
+    first figures belong to until that batch reaches a heading of its own.
+    """
     figures: list[Figure] = []
-    heading = ""
     for item, _level in document.iterate_items():
         label = str(getattr(item, "label", ""))
         if label.endswith("section_header") or label.endswith("title"):
@@ -284,7 +598,7 @@ def _write_figures(book_dir: Path, pdf_path: Path, document) -> list[Figure]:
         provenance = item.prov[0]
         page = int(provenance.page_no)
         bbox = provenance.bbox
-        figure_id = f"fig-{page}-{len(figures) + 1}"
+        figure_id = f"fig-{page}-{figure_offset + len(figures) + 1}"
         relative = f"figures/{figure_id}.png"
         _crop(pdf_path, page, bbox, book_dir / relative)
         figures.append(
@@ -297,7 +611,7 @@ def _write_figures(book_dir: Path, pdf_path: Path, document) -> list[Figure]:
                 path=relative,
             )
         )
-    return figures
+    return figures, heading
 
 
 def _crop(pdf_path: Path, page: int, bbox, out_path: Path) -> None:
@@ -314,5 +628,24 @@ def load_figures(book_slug: str) -> list[Figure]:
     path = config.WORK_DIR / book_slug / FIGURES_JSON
     if not path.exists():
         return []
-    records = json.loads(path.read_text(encoding="utf-8"))
-    return [Figure(**{**record, "bbox": tuple(record["bbox"])}) for record in records]
+    return [_figure(record) for record in json.loads(path.read_text(encoding="utf-8"))]
+
+
+def main(argv: list[str] | None = None) -> int:
+    """``python -m app.extract``: one batch, run by ``_run_batch_child``.
+
+    Internal, as ``python -m app.worker`` is: ``bin/glosator`` stays the only
+    way in.
+    """
+    parser = argparse.ArgumentParser(prog="app.extract")
+    parser.add_argument("--book", required=True)
+    parser.add_argument("--pdf", required=True, type=Path)
+    parser.add_argument("--settings", required=True, type=json.loads)
+    args = parser.parse_args(argv)
+    config.ensure_dirs()
+    extract_batch(args.book, args.pdf, args.settings)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

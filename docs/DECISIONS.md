@@ -454,3 +454,45 @@ Four rules, each against one of those:
   as "<number>-2 <title> (continued)", within the same chapter.
 
 On that book all 67 chunks now carry a section of their own chapter.
+
+## 2026-11-01 — docling runs on the card when it is free, one batch per child process
+
+This supersedes "docling runs on the CPU, always" and "The image installs
+CPU-only torch". Both were right for a 4 GB card that Ollama already held;
+neither cause survives a 16 GB card and a pipeline whose stages run one after
+another.
+
+**The device is chosen per batch, from what nvml reports.** With at least
+`EXTRACT_MIN_FREE_MB` free the batch runs on the card; otherwise on the CPU,
+and the reason is logged either way. Free memory is what Ollama leaves: the
+worker unloads its model after every job, so in a queue of extract → chunk →
+generate the card is docling's while it extracts and Ollama's afterwards. The
+CPU is a correct answer, not a failure: the result is the same, only slower.
+`GLOSATOR_DOCLING_DEVICE=cpu|cuda` overrides the choice.
+
+**A partial conversion is an error.** The OOM recorded in `docs/PILOT.md` did
+not raise: docling logged "Stage layout failed" and returned two figures of
+four. `_convert` now asks for the conversion status and raises on anything
+but success. On the card that sends the batch to the CPU; on the CPU it fails
+the job, because a silent half-result is worse than a stopped one.
+
+**Each batch is a child process.** torch keeps a caching allocator on the
+card, so freeing docling's converter hands its memory back to that cache and
+not to the driver; the worker outlives the stage and would carry that memory
+into the generate job. Process exit is the only thing that returns it
+unconditionally, which tachygraf found for its ASR stage too. The child is
+killed with the worker (`PR_SET_PDEATHSIG`) and by the worker's SIGTERM.
+
+**Batches of `EXTRACT_BATCH_PAGES` pages, kept on disk.** A 919-page book in
+one docling run holds every page's layout in memory at once and loses all of
+it to one bad page. Each batch writes `batches/<first>-<last>.json` with the
+settings it ran under, and a later run reuses a batch whose settings match, so
+a stopped extraction resumes. Figure ids still count through the whole range,
+and a figure before a batch's first heading belongs to the previous batch's
+last one, so the ids and headings are the same as from a single run.
+
+**The preview stays on the CPU.** It runs in the interface's own process,
+which lives for the whole session and would keep whatever it put on the card.
+
+The image grows from about 5 GB to about 10 GB for the CUDA wheels. The unit
+gets the card through CDI, and the launcher refuses to start without a spec.
