@@ -266,6 +266,29 @@ def test_running_head_ignores_figure_captions_and_body_text() -> None:
     assert chunk_module.running_head("no numbers here at all") is None
 
 
+def test_running_head_skips_a_contents_entry() -> None:
+    # A chapter's own contents page, as the second book tested prints it.
+    text = (
+        "   1.1 Introduction to Digital and Analog Electronics ........... 8\n"
+        "1.4 Current & Voltage\n"
+    )
+    assert chunk_module.running_head(text) == ("1.4", "Current & Voltage")
+
+
+def test_running_head_skips_a_sentence_wrapped_after_a_figure_number() -> None:
+    text = "as Figure\n6.3 shows an excerpt from the TI 74HC164 chip\n"
+    assert chunk_module.running_head(text) is None
+
+
+def test_headings_are_listed_in_page_order() -> None:
+    text = "1.4 Current & Voltage\nbody\n1.5 Units\nbody\n1.6 Power\n"
+    assert [number for number, _title in chunk_module.headings(text)] == [
+        "1.4",
+        "1.5",
+        "1.6",
+    ]
+
+
 def test_identify_prefers_a_numbered_bookmark() -> None:
     span = Span("2.3.1 Emitter follower", 2, 71, 74)
     assert chunk_module.identify(span, RUNNING_HEAD_SAMPLE, 1) == (

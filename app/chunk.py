@@ -30,6 +30,8 @@ RUNNING_HEAD_RE = re.compile(
     r"^[ \t\r]*(\d{1,2}\.\d{1,2})[ \t\r]+(\S[^\n]*?)[ \t\r]*(?:\d{1,4})?[ \t\r]*$",
     re.MULTILINE,
 )
+# Leader dots between a contents entry and its page number: "Ohm's Law .... 32".
+CONTENTS_LEADER_RE = re.compile(r"(?:\.\s?){4,}")
 CHUNKS_JSON = "chunks.json"
 EXPORT_CHUNKS_JSON = "chunks-export.json"
 
@@ -118,14 +120,36 @@ def running_head(text: str) -> tuple[str, str] | None:
     """
     counts: Counter[str] = Counter()
     titles: dict[str, str] = {}
-    for match in RUNNING_HEAD_RE.finditer(text):
-        number, title = _reunite_split_number(match.group(1), match.group(2).strip())
+    for number, title in headings(text):
         counts[number] += 1
         titles.setdefault(number, title)
     if not counts:
         return None
     number = max(counts, key=counts.__getitem__)
     return number, titles[number]
+
+
+def headings(text: str) -> list[tuple[str, str]]:
+    """Every numbered heading line in the text, in order, as (number, title)."""
+    found: list[tuple[str, str]] = []
+    for match in RUNNING_HEAD_RE.finditer(text):
+        number, title = _reunite_split_number(match.group(1), match.group(2).strip())
+        if is_heading_title(title):
+            found.append((number, title))
+    return found
+
+
+def is_heading_title(title: str) -> bool:
+    """False for the two kinds of line that look numbered and are not heads.
+
+    A contents entry carries leader dots out to its page number, and became
+    a note title once, dots and all. A sentence wrapped after a figure number
+    ("Figure\n6.3 shows an excerpt ...") starts lower case; a heading never
+    does.
+    """
+    if CONTENTS_LEADER_RE.search(title):
+        return False
+    return not title[:1].islower()
 
 
 def _reunite_split_number(number: str, title: str) -> tuple[str, str]:
