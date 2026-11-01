@@ -230,6 +230,9 @@ def run(
         for page in range(first_page, last_page + 1)
     )
     chapter_files = _write_chapters(book_dir, markdown, first_page, last_page)
+    # Ids count every picture docling found, decorations included, so that a
+    # kept batch's ids stay valid; only the list the notes see drops them.
+    figures = [figure for figure in figures if not is_decoration(figure)]
     _write_json(book_dir / FIGURES_JSON, [asdict(figure) for figure in figures])
     log.event(
         "extract",
@@ -275,6 +278,18 @@ def _reusable_batch(book_dir: Path, wanted: dict[str, object]) -> dict | None:
         return None
     log.event("extract", "batch reused", pages=wanted["pages"])
     return record
+
+
+def is_decoration(figure: Figure) -> bool:
+    """True for a margin icon: a picture with no caption, narrower than a figure.
+
+    "Design Your Own Video Game Console" marks every callout box with a black
+    "WARNING!", "TIP", "NOTE" or "INTERESTING FACT" tile, and docling crops
+    each one as a picture: over a hundred in one book. They would be embedded
+    in the notes and described by the vision pass, one model call each.
+    """
+    left, _top, right, _bottom = figure.bbox
+    return not figure.caption and abs(right - left) <= config.DECORATION_MAX_WIDTH_PT
 
 
 def _figure(entry: dict) -> Figure:

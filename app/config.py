@@ -120,6 +120,11 @@ TEXT_LAYER_MIN_CHARS: int = 180
 FIGURE_DPI: int = 200
 FIGURE_PAD_PT: float = 6.0
 
+# An uncaptioned picture at most this wide is a margin icon, not a figure.
+# The callout tiles of the second book are 40-79 pt wide; the narrowest
+# uncaptioned pictures worth keeping there, photos of parts, are 95 pt.
+DECORATION_MAX_WIDTH_PT: float = 80.0
+
 # Pages rendered by the extraction preview in the UI.
 PREVIEW_PAGES: int = 3
 

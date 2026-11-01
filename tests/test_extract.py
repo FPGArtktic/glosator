@@ -131,7 +131,7 @@ def _fake_child(calls: list[tuple[int, int]]):
             id=f"fig-{first}-{settings['figure_offset'] + 1}",
             page=first,
             bbox=(0.0, 0.0, 1.0, 1.0),
-            caption="",
+            caption=f"Figure {first}",
             heading=settings["heading"] or f"heading {first}",
             path=f"figures/fig-{first}.png",
         )
@@ -311,3 +311,24 @@ def test_compact_tables_strips_cell_padding_and_long_rules() -> None:
         "| RTCC | Input |\n"
         "\nText  with  two  spaces stays.\n"
     )
+
+
+def _picture(caption: str, width_pt: float) -> extract.Figure:
+    return extract.Figure(
+        id="fig-1-1",
+        page=1,
+        bbox=(100.0, 500.0, 100.0 + width_pt, 400.0),
+        caption=caption,
+        heading="",
+        path="figures/fig-1-1.png",
+    )
+
+
+def test_a_narrow_uncaptioned_picture_is_a_decoration() -> None:
+    # The black "WARNING!" tile beside a callout box: 63 pt, no caption.
+    assert extract.is_decoration(_picture("", 63.0))
+
+
+def test_a_captioned_or_wide_picture_is_a_figure() -> None:
+    assert not extract.is_decoration(_picture("Figure 3.2 - Switches.", 63.0))
+    assert not extract.is_decoration(_picture("", 95.0))
