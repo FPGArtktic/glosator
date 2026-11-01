@@ -22,6 +22,12 @@ PublishPort=7860:7860
 Network=pasta:--map-host-loopback,169.254.1.2
 Environment=OLLAMA_URL=http://host.containers.internal:11434
 
+# The card, through CDI, for docling. The extraction stage takes it only when
+# nvml reports it free and hands it back by exiting; Ollama, on the host, is
+# the only other user. The spec is regenerated at every driver update by:
+#   sudo systemctl enable --now nvidia-cdi-refresh.path nvidia-cdi-refresh.service
+AddDevice=nvidia.com/gpu=all
+
 Volume=@BOOKS@:/in:ro
 Volume=@NOTES@:/out:Z
 Volume=@REPO@/work:/work:Z

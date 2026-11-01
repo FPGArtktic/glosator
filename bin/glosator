@@ -69,6 +69,14 @@ preflight() {
     fi
     podman image exists glosator:latest ||
         die "no glosator:latest image; run: glosator build"
+    # The unit asks for the card through CDI, and without a spec podman fails
+    # at start with a message about nvidia.com/gpu that does not say what to
+    # run. Either location counts. The refresh units are the fix rather than a
+    # one-off generate: /var/run is a tmpfs, and a spec in /etc/cdi names the
+    # driver's library versions and goes stale at the next driver update.
+    [ -f /etc/cdi/nvidia.yaml ] || [ -f /var/run/cdi/nvidia.yaml ] ||
+        die "no CDI spec for the GPU; run: sudo systemctl enable --now" \
+            "nvidia-cdi-refresh.path nvidia-cdi-refresh.service"
     curl -s -m 3 -o /dev/null "$OLLAMA_URL/api/tags" ||
         echo "glosator: warning: no Ollama at $OLLAMA_URL; extraction will" \
              "work, generation will not" >&2
