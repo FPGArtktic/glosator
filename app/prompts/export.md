@@ -70,8 +70,10 @@ with their answers. Each exercise is one item of a numbered list: the
 question on one line, then on the next line, indented by three spaces,
 "Answer:" and the answer the source gives. Shorten a long question or answer,
 but keep every command, option, path and value exactly as the source writes
-it. A question whose answer is not in the source text is left out: never
-answer one yourself. Omit this whole section if the source has no exercises.
+it. Copy each answer from the source; never complete, correct or guess one,
+even where you know a better answer. Where the source shows an answer only as
+an image, or leaves it out, leave that question (or that step of it) out.
+Omit this whole section if the source has no exercises.
 
 ---
 
