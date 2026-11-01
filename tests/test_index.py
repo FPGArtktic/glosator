@@ -203,3 +203,19 @@ def test_polish_chapter_map_and_glossary_speak_polish() -> None:
         [("wtórnik", "follower", ["2.1 Podstawy"])], "Książka", "bk1", language=POLISH
     )
     assert "# Słowniczek" in glossary
+
+
+def test_run_tags_the_glossary_with_the_book_field() -> None:
+    chunks = [_chunk(1, "2.1", "Basics", 71)]
+    generate.write_note(generate.note_path(chunks[0], "Transistors"), NOTE)
+
+    index.run(
+        chunks,
+        {2: "Transistors"},
+        book_title="Book",
+        book_tag="bk1",
+        domain="electronics",
+    )
+
+    glossary = (config.OUT_DIR / index.GLOSSARY_NOTE).read_text(encoding="utf-8")
+    assert "tags: [electronics, bk1, glossary]" in glossary

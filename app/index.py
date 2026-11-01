@@ -188,7 +188,7 @@ def run(
     glossary_path = generate.out_root(out_dir) / GLOSSARY_NOTE
     generate.write_note(
         glossary_path,
-        glossary_note(merge_glossary(pairs), book_title, book_tag, language=language),
+        glossary_note(merge_glossary(pairs), book_title, book_tag, domain, language),
         out_dir,
     )
     written.append(glossary_path)
