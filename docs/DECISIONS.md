@@ -433,3 +433,24 @@ CPU, and nothing in a 6k-token chunk needs the room.
 This is evidence from a different kind of source — speech in Polish, not a
 textbook in English — so it is checked against this pipeline's own pilot on a
 book before the first full run (`docs/PILOT.md`).
+
+## 2026-11-01 — A page-range chunk takes its chapter from the outline and its name from the section it continues
+
+"Design Your Own Video Game Console" has an outline of chapters only, each
+chapter opening with its own contents pages, and prints no running head with
+a section number. Its numbered headings are in the text. Chunked by page
+range, it produced titles from contents entries (with the leader dots), from
+sentences wrapped after "Figure", and "047 pages 645-657" for chunks cut from
+the middle of a long section.
+
+Four rules, each against one of those:
+
+- A contents page is left out of the text (five dotted entries, or dotted
+  entries making half the page).
+- A heading has no leader dots and starts with a capital or a digit.
+- A page range's chapter is the last chapter bookmark at or before its first
+  page, and a heading number from another chapter is not a heading.
+- A chunk with no heading of its own continues the last heading before it,
+  as "<number>-2 <title> (continued)", within the same chapter.
+
+On that book all 67 chunks now carry a section of their own chapter.
