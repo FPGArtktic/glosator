@@ -35,6 +35,9 @@ CHAPTER_HEADING_RE = re.compile(
     r"\s*(?:chapter|rozdzia[lł])?\s*(\d{1,2})(?!\s*\.\s*\d)\b", re.IGNORECASE
 )
 FIGURES_JSON = "figures.json"
+TABLE_ROW_RE = re.compile(r"^\|.*\|[ \t]*$", re.MULTILINE)
+TABLE_PADDING_RE = re.compile(r"[ \t]{2,}")
+TABLE_RULE_RE = re.compile(r"-{4,}")
 PAGES_DIR = "pages"
 BATCHES_DIR = "batches"
 # Bumped when what a batch writes changes, so older batches are not reused.
@@ -466,9 +469,24 @@ def _convert_on_best_device(
 
 def _write_pages(book_slug: str, document, first_page: int, last_page: int) -> None:
     for page in range(first_page, last_page + 1):
-        path = page_markdown_path(book_slug, page)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        _write_text(path, document.export_to_markdown(page_no=page).strip() + "\n")
+        markdown = compact_tables(document.export_to_markdown(page_no=page))
+        _write_text(page_markdown_path(book_slug, page), markdown.strip() + "\n")
+
+
+def compact_tables(markdown: str) -> str:
+    """Strip the padding docling puts into every table cell.
+
+    docling pads each cell to the widest one in its column, and a column with
+    one long description pads the whole table: a pin table of "Design Your
+    Own Video Game Console" came out at 36 kB, of which 5 kB was content. The
+    padding goes to the model as tokens and past the chunk budget as size.
+    """
+    return TABLE_ROW_RE.sub(_compact_row, markdown)
+
+
+def _compact_row(match: re.Match[str]) -> str:
+    row = TABLE_PADDING_RE.sub(" ", match.group(0))
+    return TABLE_RULE_RE.sub("---", row)
 
 
 def _write_json(path: Path, payload: object) -> None:

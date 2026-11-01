@@ -294,3 +294,20 @@ def test_turning_formulas_off_does_not_reuse_a_batch_made_with_them(
     monkeypatch.setattr(config, "DOCLING_FORMULAS", False)
     extract.run("bk", Path("/b.pdf"), 1, 2)
     assert calls == [(1, 2)]
+
+
+def test_compact_tables_strips_cell_padding_and_long_rules() -> None:
+    markdown = (
+        "Figure 11.4 - Pins.\n\n"
+        "| Name      | Type   |\n"
+        "|-----------|--------|\n"
+        "| RTCC      | Input  |\n"
+        "\nText  with  two  spaces stays.\n"
+    )
+    assert extract.compact_tables(markdown) == (
+        "Figure 11.4 - Pins.\n\n"
+        "| Name | Type |\n"
+        "|---|---|\n"
+        "| RTCC | Input |\n"
+        "\nText  with  two  spaces stays.\n"
+    )
