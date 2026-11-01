@@ -59,6 +59,16 @@ def test_generate_applies_the_configured_options(
     assert call["images"] == ["/tmp/fig.png"]
 
 
+def test_generate_asks_for_no_thinking(monkeypatch: pytest.MonkeyPatch) -> None:
+    # gemma4 thinks by default, and the thinking eats the NUM_PREDICT budget.
+    fake = FakeClient()
+    monkeypatch.setattr(ollama, "client", lambda: fake)
+
+    ollama.generate("gemma4:31b", "prompt")
+
+    assert fake.calls[0]["think"] is False
+
+
 def test_generate_rejects_an_empty_response(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ollama, "client", lambda: FakeClient(response="   "))
     with pytest.raises(ollama.OllamaUnavailable, match="empty"):

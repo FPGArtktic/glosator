@@ -48,12 +48,21 @@ def unload(model: str) -> None:
 
 
 def generate(model: str, prompt: str, images: list[Path] | None = None) -> str:
-    """One completion. Blocks for as long as ``OLLAMA_TIMEOUT_S`` allows."""
+    """One completion. Blocks for as long as ``OLLAMA_TIMEOUT_S`` allows.
+
+    Thinking is turned off explicitly, because gemma4 thinks unless told not
+    to, and its thinking counts against ``NUM_PREDICT``. tachygraf measured
+    what that costs on this card: 735 s for one window with thinking against
+    134 s without, and no fewer errors; gemma4:12b at the pipeline's
+    temperature looped until the budget was gone and returned nothing.
+    Models without thinking accept the field and ignore it.
+    """
     try:
         response = client().generate(
             model=model,
             prompt=prompt,
             images=[str(image) for image in images] if images else None,
+            think=False,
             keep_alive=config.OLLAMA_KEEP_ALIVE,
             options={
                 "num_ctx": config.NUM_CTX,
