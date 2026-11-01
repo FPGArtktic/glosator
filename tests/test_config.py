@@ -89,8 +89,8 @@ def test_ensure_dirs_is_idempotent(
 
 
 def test_the_ollama_options_are_the_ones_claude_md_fixes() -> None:
-    # Changing these is a decision, not a tweak: they are sized for 4 GB of
-    # VRAM and a 6k-token chunk. See CLAUDE.md and docs/DECISIONS.md.
+    # Changing these is a decision, not a tweak: they are the options under
+    # which the text model was measured. See docs/DECISIONS.md, 2026-11-01.
     assert config.NUM_CTX == 12288
     assert config.TEMPERATURE == 0.25
     assert config.NUM_PREDICT == 2048
@@ -128,12 +128,16 @@ def test_the_launcher_keeps_no_model_name_of_its_own() -> None:
     # launcher then unloaded a model the app had never loaded while still
     # reporting a free GPU. The names have one home: app/config.py.
     text = LAUNCHER.read_text(encoding="utf-8")
-    assert "gemma3" not in text
+    assert "gemma" not in text
     assert "qwen" not in text
 
 
 def test_the_launcher_unloads_the_models_config_names() -> None:
-    assert _launcher_models() == [config.TEXT_MODEL, config.VISION_MODEL]
+    assert _launcher_models() == [
+        config.TEXT_MODEL,
+        config.FAST_TEXT_MODEL,
+        config.VISION_MODEL,
+    ]
 
 
 def test_the_launcher_honours_a_model_chosen_in_the_environment() -> None:

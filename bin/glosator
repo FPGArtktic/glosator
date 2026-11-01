@@ -87,6 +87,7 @@ sys.path.insert(0, sys.argv[1])
 from app import config
 
 print(config.TEXT_MODEL)
+print(config.FAST_TEXT_MODEL)
 print(config.VISION_MODEL)
 ' "$REPO" 2>/dev/null && return 0
     echo "glosator: cannot read the model names from app/config.py; unload" \

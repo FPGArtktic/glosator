@@ -392,3 +392,44 @@ pass through `generate.assemble`, so its frontmatter, section order and figure
 embeds are whatever the model produced, and the `index` stage will treat a
 file without the generator marker as someone else's and leave it alone. Notes
 brought back from an export are the operator's to place.
+
+## 2026-11-01 — The machine has a 16 GB card; the text model is gemma4:31b
+
+The laptop with a 4 GB RTX 3050 and 64 GB of RAM is gone. glosator now runs on
+an RTX 5070 Ti with 16 GB (Blackwell, compute capability 12.0), a Ryzen 7
+7800X3D and 30 GB of RAM. Every size in this log that says "4 GB" was a
+measurement of that laptop, not a property of the pipeline.
+
+The model choice was not re-measured here from scratch. tachygraf, the sibling
+pipeline that writes the same kind of note from a recording, already compared
+seven models on this card with the same prompt shape, the same options
+(`num_ctx` 12288, temperature 0.25, `num_predict` 2048) and the same review
+method: every claim checked against the source by hand
+(`tachygraf/docs/PILOT.md`, 2026-10-30, a 54-minute talk in three windows).
+
+| model                   | wall clock, 3 windows | content errors |
+|-------------------------|-----------------------|----------------|
+| `gemma4:31b`            | 336 s                 | 0, 1 minor     |
+| `gemma4:26b` (MoE)      | 59 s                  | 2, 2 minor     |
+| `qwen2.5:32b`           | 507 s                 | ~3, 5 minor    |
+| `qwen3:32b`             | 647 s                 | ~4, 2 minor    |
+| `gemma3:27b`            | 417 s                 | 9, 4 minor     |
+
+The qwen models also wrote fewer claims and cited none of them. So
+`gemma4:31b` replaces `qwen2.5:32b` as the default, and is faster as well as
+better: about 20 GB of weights, of which the card holds roughly three
+quarters, against qwen2.5's 21.8 GiB.
+
+`gemma4:26b` becomes a named second choice, `FAST_TEXT_MODEL`, because it is
+seven times faster for two more errors per hundred claims. On a whole book that
+is the difference between an evening and a night, and the operator should be
+able to choose it without typing a tag. It stays the second choice: notes
+someone studies from are where errors cost most.
+
+The Ollama options stay as they are. They are the ones under which gemma4:31b
+made no error; widening the context would push more of its layers onto the
+CPU, and nothing in a 6k-token chunk needs the room.
+
+This is evidence from a different kind of source — speech in Polish, not a
+textbook in English — so it is checked against this pipeline's own pilot on a
+book before the first full run (`docs/PILOT.md`).

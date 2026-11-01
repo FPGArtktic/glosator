@@ -29,7 +29,10 @@ DB_PATH: Path = STATE_DIR / "glosator.db"
 PROMPT_DIR: Path = Path(__file__).parent / "prompts"
 
 OLLAMA_URL: str = os.environ.get("OLLAMA_URL", "http://ollama:11434")
-TEXT_MODEL: str = os.environ.get("GLOSATOR_TEXT_MODEL", "qwen2.5:32b")
+TEXT_MODEL: str = os.environ.get("GLOSATOR_TEXT_MODEL", "gemma4:31b")
+# Seven times faster than TEXT_MODEL for about two more errors per hundred
+# claims (docs/DECISIONS.md, 2026-11-01): for a book that matters less.
+FAST_TEXT_MODEL: str = os.environ.get("GLOSATOR_FAST_MODEL", "gemma4:26b")
 VISION_MODEL: str = os.environ.get("GLOSATOR_VISION_MODEL", "qwen3-vl:8b")
 
 # Ollama request options, applied to every call (see CLAUDE.md).
@@ -37,11 +40,11 @@ NUM_CTX: int = 12288
 TEMPERATURE: float = 0.25
 NUM_PREDICT: int = 2048
 
-# A 12B model offloaded to CPU generates at a few tokens per second, so a
-# single chunk can legitimately take twenty minutes. Fail only on a real hang.
+# A model partly offloaded to the CPU generates at a few tokens per second, so
+# a single chunk can legitimately take twenty minutes. Fail only on a real hang.
 OLLAMA_TIMEOUT_S: int = 2700
 
-# Keep the model resident between chunks; reloading 8 GB of weights per call
+# Keep the model resident between chunks; reloading 20 GB of weights per call
 # would dominate the run time.
 OLLAMA_KEEP_ALIVE: str = "30m"
 
