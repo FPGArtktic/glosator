@@ -616,3 +616,24 @@ English notes do not change.
 Not yet measured: how well `gemma4:31b` writes Polish notes. A pilot on a
 Polish book, reviewed claim by claim as in `docs/PILOT.md`, comes before a
 full run.
+
+## 2026-11-01 — A picture the book keeps reprinting is not a figure
+
+The LPIC-1 notes embedded the Linux Professional Institute logo, with a
+vision-pass description of it, at the start of every lesson: 55 of the 58
+pictures docling found in 101 and 55 of 61 in 102. The logo is too wide for
+the margin-icon rule, and has no caption, so nothing caught it. The console
+book reprints its cover at ten chapter starts in the same way.
+
+An uncaptioned picture is now dropped from `figures.json` when the same
+picture appears on at least 3 pages spread over at least 20, at the same
+size within 2 pt. "The same picture" is an 8x8 average hash within 4 of 64
+bits, which every crop of the logo meets (at most 2 apart). Each condition
+is there because a real figure failed without it, on the console book:
+
+- pinouts of a 74HC00 and a 74HC08 hash 2 bits apart, but stand on
+  neighbouring pages (236–240), not across the book;
+- code listings printed as grey boxes hash alike, but each box is as tall
+  as its listing (40, 41, 61 pt).
+
+On the three books this drops exactly the logos and the reprinted covers.

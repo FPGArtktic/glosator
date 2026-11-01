@@ -25,6 +25,8 @@ import unicodedata
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from PIL import Image
+
 from app import config, log, pdf
 
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*\S)\s*$", re.MULTILINE)
@@ -233,6 +235,7 @@ def run(
     # Ids count every picture docling found, decorations included, so that a
     # kept batch's ids stay valid; only the list the notes see drops them.
     figures = [figure for figure in figures if not is_decoration(figure)]
+    figures = drop_repeated(figures, book_dir)
     _write_json(book_dir / FIGURES_JSON, [asdict(figure) for figure in figures])
     log.event(
         "extract",
@@ -290,6 +293,79 @@ def is_decoration(figure: Figure) -> bool:
     """
     left, _top, right, _bottom = figure.bbox
     return not figure.caption and abs(right - left) <= config.DECORATION_MAX_WIDTH_PT
+
+
+def image_hash(path: Path) -> int:
+    """64-bit average hash: which of 8x8 grey cells are brighter than the mean.
+
+    Survives the small shifts and rescaling between two crops of the same
+    logo, which an exact comparison of the pixels would not.
+    """
+    with Image.open(path) as image:
+        cells = image.convert("L").resize((8, 8)).tobytes()
+    mean = sum(cells) / len(cells)
+    return sum(1 << bit for bit, cell in enumerate(cells) if cell > mean)
+
+
+@dataclass(frozen=True)
+class Sighting:
+    """One uncaptioned picture, as far as telling repeats apart needs."""
+
+    image: int  # image_hash of the crop
+    page: int
+    width_pt: float
+    height_pt: float
+
+    def same_picture(self, other: Sighting) -> bool:
+        # A logo or a reprinted cover is placed at the same size every time;
+        # code listings printed as grey boxes hash alike but differ in height.
+        tolerance = config.REPEATED_FIGURE_SIZE_TOLERANCE_PT
+        return (
+            (self.image ^ other.image).bit_count() <= config.REPEATED_FIGURE_MAX_BITS
+            and abs(self.width_pt - other.width_pt) <= tolerance
+            and abs(self.height_pt - other.height_pt) <= tolerance
+        )
+
+
+def repeated_figures(sightings: dict[str, Sighting]) -> set[str]:
+    """Ids of pictures that recur across the book: part of the page, not the text.
+
+    Each picture joins the group of the first earlier one it matches.
+    """
+    groups: list[tuple[Sighting, list[str], set[int]]] = []
+    for figure_id, sighting in sightings.items():
+        for first, members, pages in groups:
+            if first.same_picture(sighting):
+                members.append(figure_id)
+                pages.add(sighting.page)
+                break
+        else:
+            groups.append((sighting, [figure_id], {sighting.page}))
+    return {
+        figure_id
+        for _first, members, pages in groups
+        if len(pages) >= config.REPEATED_FIGURE_MIN_PAGES
+        and max(pages) - min(pages) >= config.REPEATED_FIGURE_MIN_SPAN_PAGES
+        for figure_id in members
+    }
+
+
+def drop_repeated(figures: list[Figure], book_dir: Path) -> list[Figure]:
+    """The figures without the uncaptioned pictures the book keeps reprinting."""
+    sightings = {
+        figure.id: Sighting(
+            image_hash(book_dir / figure.path),
+            figure.page,
+            abs(figure.bbox[2] - figure.bbox[0]),
+            abs(figure.bbox[1] - figure.bbox[3]),
+        )
+        for figure in figures
+        if not figure.caption and (book_dir / figure.path).exists()
+    }
+    repeated = repeated_figures(sightings)
+    if repeated:
+        log.event("extract", "repeated pictures dropped", count=len(repeated))
+    return [figure for figure in figures if figure.id not in repeated]
 
 
 def _figure(entry: dict) -> Figure:

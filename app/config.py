@@ -136,6 +136,21 @@ FIGURE_PAD_PT: float = 6.0
 # uncaptioned pictures worth keeping there, photos of parts, are 95 pt.
 DECORATION_MAX_WIDTH_PT: float = 80.0
 
+# An uncaptioned picture that comes back on this many pages is part of the
+# page, not of the text: the LPI materials print their logo at the top of
+# every lesson, 55 of the 58 pictures docling found in one book.
+REPEATED_FIGURE_MIN_PAGES: int = 3
+# ... and spread across the book: its first and last page at least this far
+# apart. Datasheet drawings of related chips (two pinouts, two gate diagrams)
+# hash alike too, but sit together on a few neighbouring pages.
+REPEATED_FIGURE_MIN_SPAN_PAGES: int = 20
+# Two crops are the same picture when their 8x8 average hashes differ in at
+# most this many of 64 bits. Crops of the LPI logo differ by up to 2, a cover
+# reprinted at each chapter by 0.
+REPEATED_FIGURE_MAX_BITS: int = 4
+# ... and the same size, within this many points each way.
+REPEATED_FIGURE_SIZE_TOLERANCE_PT: float = 2.0
+
 # Pages rendered by the extraction preview in the UI.
 PREVIEW_PAGES: int = 3
 

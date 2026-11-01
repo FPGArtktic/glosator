@@ -332,3 +332,98 @@ def test_a_narrow_uncaptioned_picture_is_a_decoration() -> None:
 def test_a_captioned_or_wide_picture_is_a_figure() -> None:
     assert not extract.is_decoration(_picture("Figure 3.2 - Switches.", 63.0))
     assert not extract.is_decoration(_picture("", 95.0))
+
+
+def _logo(path: Path, shift: int = 0) -> None:
+    """A yellow disc beside a block of text, like the LPI logo."""
+    from PIL import Image, ImageDraw
+
+    image = Image.new("RGB", (200, 80), "white")
+    draw = ImageDraw.Draw(image)
+    draw.ellipse((5 + shift, 5, 75 + shift, 75), fill="gold")
+    draw.rectangle((95 + shift, 20, 190, 30), fill="black")
+    draw.rectangle((95 + shift, 45, 170, 55), fill="black")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(path)
+
+
+def _diagram(path: Path) -> None:
+    from PIL import Image, ImageDraw
+
+    image = Image.new("RGB", (200, 80), "white")
+    ImageDraw.Draw(image).line((0, 79, 199, 0), fill="black", width=6)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(path)
+
+
+def _figure_on(page: int, name: str, caption: str = "") -> extract.Figure:
+    return extract.Figure(
+        id=name,
+        page=page,
+        bbox=(100.0, 500.0, 300.0, 400.0),
+        caption=caption,
+        heading="",
+        path=f"figures/{name}.png",
+    )
+
+
+def test_a_logo_on_every_lesson_is_dropped(tmp_path: Path) -> None:
+    figures = []
+    for page in (11, 40, 75):
+        figures.append(_figure_on(page, f"logo-{page}"))
+        _logo(tmp_path / "figures" / f"logo-{page}.png", shift=page % 3)
+    figures.append(_figure_on(41, "diagram"))
+    _diagram(tmp_path / "figures" / "diagram.png")
+
+    kept = extract.drop_repeated(figures, tmp_path)
+
+    assert [figure.id for figure in kept] == ["diagram"]
+
+
+def test_a_picture_on_two_pages_or_with_a_caption_is_kept(tmp_path: Path) -> None:
+    figures = [_figure_on(11, "a"), _figure_on(40, "b")]
+    figures += [_figure_on(75, "c", caption="Figure 1. The logo")]
+    for figure in figures:
+        _logo(tmp_path / figure.path)
+
+    kept = extract.drop_repeated(figures, tmp_path)
+
+    assert [figure.id for figure in kept] == ["a", "b", "c"]
+
+
+def test_repeated_figures_groups_within_the_bit_tolerance() -> None:
+    near = 0b111  # three bits from zero
+    far = (1 << 40) - 1  # forty bits from zero
+    sightings = {
+        "x1": _sighting(0, 1),
+        "x2": _sighting(near, 50),
+        "x3": _sighting(0, 90),
+        "y": _sighting(far, 120),
+    }
+    assert extract.repeated_figures(sightings) == {"x1", "x2", "x3"}
+
+
+def test_alike_drawings_on_neighbouring_pages_are_kept() -> None:
+    # Pinouts of a 74HC00 and a 74HC08 on pages 236-240 of the console book
+    # hash two bits apart, but they are figures, not a running logo.
+    sightings = {
+        "pinout-00": _sighting(0, 236),
+        "pinout-08": _sighting(0b11, 237),
+        "gates": _sighting(0, 240),
+    }
+    assert extract.repeated_figures(sightings) == set()
+
+
+def test_alike_boxes_of_different_sizes_are_kept() -> None:
+    # Code listings printed as grey boxes on pages 210, 567 and 721 hash
+    # within the tolerance, but each box is as tall as its listing.
+    sightings = {
+        "listing-a": _sighting(0, 210, height=61.0),
+        "listing-b": _sighting(0b1, 567, height=40.0),
+        "listing-c": _sighting(0b11, 721, height=41.0),
+    }
+    assert extract.repeated_figures(sightings) == set()
+
+
+def _sighting(image: int, page: int, height: float = 70.0) -> extract.Sighting:
+    return extract.Sighting(image, page, 197.0, height)
