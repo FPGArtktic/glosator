@@ -33,7 +33,7 @@ TEXT_MODEL: str = os.environ.get("GLOSATOR_TEXT_MODEL", "gemma4:31b")
 # Seven times faster than TEXT_MODEL for about two more errors per hundred
 # claims (docs/DECISIONS.md, 2026-11-01): for a book that matters less.
 FAST_TEXT_MODEL: str = os.environ.get("GLOSATOR_FAST_MODEL", "gemma4:26b")
-VISION_MODEL: str = os.environ.get("GLOSATOR_VISION_MODEL", "qwen3-vl:8b")
+VISION_MODEL: str = os.environ.get("GLOSATOR_VISION_MODEL", "gemma4:26b")
 
 # Ollama request options, applied to every call (see CLAUDE.md).
 NUM_CTX: int = 12288

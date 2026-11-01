@@ -515,3 +515,26 @@ writes docling's markdown per page (`pages/<nnnn>.md`) and chunking reads
 those, falling back to the text layer for a page that was not extracted.
 Whether a page is a table of contents is still decided from the text layer,
 because docling may turn a contents page into a table without dotted lines.
+
+## 2026-11-01 — The vision model is gemma4:26b
+
+The figure pass was never compared on the laptop: a 6.1 GB model on a 3.7 GB
+card returned nothing after four minutes. On the 16 GB card three candidates
+described the same ten figures of "Design Your Own Video Game Console" with
+the same `figure.md` prompt: a hand-drawn circuit, a diode curve, a timing
+diagram, a tri-state selector, Karnaugh maps, a 40-pin pinout, a dense port
+mapping, a CAD schematic, an NTSC waveform and a photograph
+(`docs/PILOT.md`).
+
+- `gemma4:31b` failed two of ten: one empty answer, and one CUDA OOM while
+  encoding the image, because its vision encoder needs room the 20 GB of
+  weights have already taken. A pass that fails one figure in five is out,
+  and with it the idea of one call per chunk with its figures attached.
+- `qwen3-vl:8b` (3–9 s a figure) read the most detail, and got more of it
+  wrong: ".1uF" became "1uF" on two capacitors, "R/W" became "R/D", and a
+  pull-up resistor was put in series.
+- `gemma4:26b` (2–3 s a figure) said less and made no such error.
+
+Wrong values are what this pass must not add to a note, so `gemma4:26b` is
+the vision model. It is also already the fast text model, so a book needs
+one model family and nothing extra pulled.

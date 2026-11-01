@@ -2,8 +2,10 @@
 # Copyright (C) 2026 Mateusz <109816464+FPGArtktic@users.noreply.github.com>
 """Optional figure pass: one vision call per crop, inserted into its note.
 
-Runs as its own pass over the whole book. Only one model fits in 4 GB of VRAM,
-so text and vision calls must never interleave per chunk.
+Runs as its own pass over the whole book. The card holds one model at a time,
+and the text model leaves no room for an image encoder beside it (gemma4:31b
+ran out of memory encoding a figure), so text and vision calls must never
+interleave per chunk.
 """
 
 from __future__ import annotations
