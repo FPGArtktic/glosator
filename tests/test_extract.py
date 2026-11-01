@@ -280,3 +280,17 @@ def test_the_child_entry_point_runs_one_batch(monkeypatch) -> None:
     )
     assert code == 0
     assert seen == [("bk", Path("/b.pdf"), settings)]
+
+
+def test_turning_formulas_off_does_not_reuse_a_batch_made_with_them(
+    monkeypatch,
+) -> None:
+    calls: list[tuple[int, int]] = []
+    monkeypatch.setattr(extract, "_run_batch_child", _fake_child(calls))
+    monkeypatch.setattr(config, "DOCLING_FORMULAS", True)
+    extract.run("bk", Path("/b.pdf"), 1, 2)
+    calls.clear()
+
+    monkeypatch.setattr(config, "DOCLING_FORMULAS", False)
+    extract.run("bk", Path("/b.pdf"), 1, 2)
+    assert calls == [(1, 2)]

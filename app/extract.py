@@ -252,6 +252,7 @@ def _batch_settings(
         "format": BATCH_FORMAT,
         "pages": [first_page, last_page],
         "ocr_langs": ocr_langs,
+        "formulas": config.DOCLING_FORMULAS,
         "figure_offset": figure_offset,
         "heading": heading,
     }
@@ -532,6 +533,7 @@ def _convert(
     )
     options.do_ocr = do_ocr
     options.do_table_structure = True
+    options.do_formula_enrichment = config.DOCLING_FORMULAS
     options.generate_picture_images = False
     if do_ocr:
         # force_full_page_ocr stays off: pages that do have a text layer keep

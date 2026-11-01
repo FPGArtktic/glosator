@@ -94,6 +94,10 @@ DOCLING_DEVICE: str = os.environ.get("GLOSATOR_DOCLING_DEVICE", "auto")
 EXTRACT_MIN_FREE_MB: int = int(os.environ.get("GLOSATOR_EXTRACT_MIN_FREE_MB", "6000"))
 DOCLING_THREADS: int = int(os.environ.get("GLOSATOR_DOCLING_THREADS", "8"))
 
+# Recognise displayed formulas and write them as LaTeX. The text layer loses
+# them: "In this case," followed by nothing (docs/PILOT.md).
+DOCLING_FORMULAS: bool = os.environ.get("GLOSATOR_FORMULAS", "1") != "0"
+
 # Pages per docling run. Each batch is a child process that exits when done,
 # which is what returns its memory to the system and its VRAM to the card, and
 # a finished batch is kept, so a stopped extraction resumes where it was.
