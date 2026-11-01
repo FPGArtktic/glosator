@@ -15,6 +15,11 @@ def test_slugify_folds_polish_diacritics() -> None:
     assert extract.slugify("???") == "untitled"
 
 
+def test_slugify_folds_the_letters_nfkd_leaves_whole() -> None:
+    assert extract.slugify("Układy cyfrowe") == "uklady-cyfrowe"
+    assert extract.slugify("ŁĄCZNIK") == "lacznik"
+
+
 @pytest.mark.parametrize(
     ("title", "expected"),
     [

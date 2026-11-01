@@ -27,6 +27,15 @@ CHAPTER_HEADING_RE = re.compile(
 )
 FIGURES_JSON = "figures.json"
 
+# NFKD decomposes ą, ć, ę, ń, ó, ś, ź and ż into a plain letter plus a
+# combining mark, which the ASCII encode in slugify then drops. It does not
+# decompose ł, because ł is a letter in its own right rather than l with a
+# stroke, so without this table "Układy cyfrowe" slugifies to "ukady-cyfrowe"
+# and the chapter folder and every link to it carry the typo.
+_UNDECOMPOSED = str.maketrans(
+    {"ł": "l", "Ł": "L", "đ": "d", "Đ": "D", "ø": "o", "Ø": "O"}
+)
+
 
 @dataclass(frozen=True)
 class Figure:
@@ -50,7 +59,11 @@ class ExtractResult:
 
 def slugify(text: str) -> str:
     """ASCII, lowercase, hyphenated. Polish diacritics fold to plain letters."""
-    folded = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+    folded = (
+        unicodedata.normalize("NFKD", text.translate(_UNDECOMPOSED))
+        .encode("ascii", "ignore")
+        .decode()
+    )
     return re.sub(r"[^a-z0-9]+", "-", folded.lower()).strip("-") or "untitled"
 
 
