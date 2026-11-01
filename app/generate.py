@@ -19,6 +19,7 @@ from pathlib import Path
 from app import config, extract, log, ollama
 from app.chunk import Chunk, estimate_tokens
 from app.extract import Figure
+from app.language import ENGLISH, Language
 
 PLACEHOLDER_RE = re.compile(r"\{\{(\w+)\}\}")
 
@@ -154,6 +155,7 @@ def assemble(
     model: str,
     generated: date | None = None,
     domain: str = config.DEFAULT_DOMAIN,
+    language: Language = ENGLISH,
 ) -> str:
     """Build the note exactly as the output contract specifies."""
     body = [
@@ -168,7 +170,7 @@ def assemble(
     for name in SECTION_ORDER:
         text = merged.get(name, "").strip()
         if text:
-            body.append(f"## {name}\n\n{text}")
+            body.append(f"## {language.heading(name)}\n\n{text}")
     return "\n\n".join(body) + "\n"
 
 
@@ -340,6 +342,7 @@ def run(
     figures: Sequence[Figure] | None = None,
     out_dir: Path | str | None = None,
     domain: str = config.DEFAULT_DOMAIN,
+    language: Language = ENGLISH,
 ) -> Path:
     """Generate one note. Raises when the input or the output is unusable."""
     source_text = chunk.text_path.read_text(encoding="utf-8")
@@ -359,6 +362,8 @@ def run(
         domain=domain,
         pages=f"{chunk.page_start}-{chunk.page_end}",
         text=source_text,
+        language=language.name,
+        glossary=load_prompt(language.glossary_prompt).strip(),
     )
 
     raw = ollama.generate(model, prompt)
@@ -379,6 +384,7 @@ def run(
         book_tag,
         model,
         domain=domain,
+        language=language,
     )
 
     path = write_note(note_path(chunk, chapter_title, out_dir), note, out_dir)

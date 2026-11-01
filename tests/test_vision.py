@@ -8,6 +8,7 @@ import pytest
 
 from app import config, generate, vision
 from app.extract import Figure
+from app.language import POLISH
 
 NOTE = """---
 section: "2.3.1"
@@ -102,3 +103,19 @@ def test_run_fails_when_the_note_has_no_embed(
     monkeypatch.setattr(vision.ollama, "generate", lambda *_a, **_k: "text")
     with pytest.raises(ValueError, match="no embed"):
         vision.run(_figure(), note_path, book_slug="bk1", chunk_text="text")
+
+
+def test_describe_asks_for_the_book_language(monkeypatch: pytest.MonkeyPatch) -> None:
+    crop = config.WORK_DIR / "bk1" / "figures" / "fig-71-1.png"
+    crop.parent.mkdir(parents=True, exist_ok=True)
+    crop.write_bytes(b"png")
+    prompts: list[str] = []
+    monkeypatch.setattr(
+        vision.ollama,
+        "generate",
+        lambda _model, prompt, images=None: prompts.append(prompt) or "Opis.",
+    )
+
+    vision.describe(_figure(), "bk1", "kontekst", language=POLISH)
+
+    assert "in 2-4 sentences in Polish." in prompts[0]

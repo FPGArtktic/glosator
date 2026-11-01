@@ -84,6 +84,14 @@ CHARS_PER_TOKEN: int = 4
 # is only what an unset book falls back to.
 DEFAULT_DOMAIN: str = os.environ.get("GLOSATOR_DOMAIN", "general")
 
+# A book with no language set gets notes in the language its text is in.
+# Polish prose has about seven of every hundred letters in ą ć ę ł ń ó ś ź ż,
+# English has none, so a share of 2 % tells them apart with room for an
+# English book quoting Polish names or a Polish one full of code.
+POLISH_LETTER_MIN_SHARE: float = 0.02
+# How much of the chunks' text the language is judged from.
+LANGUAGE_SAMPLE_CHARS: int = 200_000
+
 OCR_LANGS: str = os.environ.get("GLOSATOR_OCR_LANGS", "pol+eng")
 
 # Where docling runs: "auto" puts it on the card when nvml reports at least

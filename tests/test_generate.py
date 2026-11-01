@@ -12,6 +12,7 @@ import pytest
 from app import config, generate
 from app.chunk import Chunk
 from app.extract import Figure
+from app.language import POLISH
 
 MODEL_OUTPUT = """## In short
 
@@ -61,9 +62,12 @@ def test_note_prompt_has_no_leftover_placeholders(chunk: Chunk) -> None:
         domain="electronics",
         pages="71-74",
         text="body",
+        language="Polish",
+        glossary=generate.load_prompt("glossary-pl.md"),
     )
     assert "{{" not in prompt
     assert "2.3.1" in prompt
+    assert "Write the note in Polish" in prompt
 
 
 @pytest.mark.parametrize("name", ["note.md", "export.md"])
@@ -72,7 +76,14 @@ def test_both_prompts_forbid_a_glossary_calque(name: str) -> None:
     # words translated one at a time into a phrase no Polish textbook uses.
     prompt = generate.load_prompt(name)
     assert "one at a time" in prompt
-    assert "obszar zubożony" in prompt
+    assert "{{glossary}}" in prompt
+
+
+@pytest.mark.parametrize("name", ["glossary-en.md", "glossary-pl.md"])
+def test_both_glossary_directions_show_the_calque(name: str) -> None:
+    rules = generate.load_prompt(name)
+    assert "one at a time" in rules
+    assert "obszar zubożony" in rules
 
 
 @pytest.mark.parametrize("name", ["note.md", "export.md"])
@@ -458,3 +469,38 @@ def test_run_passes_the_domain_to_the_prompt(
     )
     assert "organic chemistry textbook" in seen[0]
     assert "{{" not in seen[0]
+
+
+def test_assemble_writes_polish_headings_for_a_polish_note(chunk: Chunk) -> None:
+    sections = {"In short": "a", "Explanation": "b", "Glossary": "- c — d"}
+    note = generate.assemble(
+        chunk, sections, "", "Book", "bk1", "gemma4:31b", language=POLISH
+    )
+    assert "## W skrócie" in note
+    assert "## Wyjaśnienie" in note
+    assert "## Słowniczek" in note
+    assert "## In short" not in note
+
+
+def test_run_asks_for_the_book_language(
+    chunk: Chunk, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prompts: list[str] = []
+
+    def fake_generate(_model: str, prompt: str, images=None) -> str:
+        prompts.append(prompt)
+        return MODEL_OUTPUT
+
+    monkeypatch.setattr(generate.ollama, "generate", fake_generate)
+    path = generate.run(
+        chunk,
+        book_slug="bk1",
+        book_title="Sztuka elektroniki",
+        book_tag="bk1",
+        chapter_title="Tranzystory",
+        figures=[],
+        language=POLISH,
+    )
+    assert "Write the note in Polish" in prompts[0]
+    assert "wtórnik emiterowy — emitter follower" in prompts[0]
+    assert "## W skrócie" in path.read_text(encoding="utf-8")

@@ -26,8 +26,11 @@ studying the subject. The note must be usable without the book open.
 Work only from the file you are given. Its frontmatter says which section and
 which pages it covers; its `## Source text` is the text of those pages.
 
-Write in English. Output exactly these markdown sections, in this order, with
-these exact headings, and nothing before or after them:
+Write the note in {{language}}: every word of it, including the stock
+phrases this prompt quotes, such as "None in this section." Only the section
+headings stay exactly as given here, in English. Output exactly these markdown
+sections, in this order, with these exact headings, and nothing before or
+after them:
 
 ## In short
 Two to four sentences: what this is and why it matters.
@@ -42,23 +45,7 @@ followed by one line saying what it is for. A formula that appears in the
 explanation belongs here too. Write "None in this section." if there are none.
 
 ## Glossary
-A markdown list of 5-15 technical terms the source text uses, each with its
-Polish equivalent, exactly in this form:
-
-- emitter follower — wtórnik emiterowy
-- heat capacity — pojemność cieplna
-- sample mean — średnia z próby
-
-Those three show the form, not the subject: take the terms from the source
-text, whatever field it belongs to.
-
-The right-hand side must be Polish. An English definition there is wrong.
-List terms, never symbols or variables: write "collector current", not "IC".
-Give the established Polish term, the one a Polish textbook on the subject
-uses. Do not translate the English words one at a time: "depletion region" is
-"obszar zubożony", not "obszar dezaktywacji", and "reverse bias" is
-"polaryzacja zaporowa", not "przewodzenie wsteczne". If you do not know the
-established term, write: term — (brak odpowiednika)
+{{glossary}}
 
 ## Pitfalls
 Mistakes or misconceptions the source warns about. Omit this whole section if
@@ -111,10 +98,10 @@ that reads well and teaches something false. They are maintained in
   quantity rises or falls with another. If you are about to write the opposite
   of the source because it sounds more familiar, write what the source says.
 - Copy every component value and part number exactly as written.
-- A glossary line coined by translating the English words one at a time is
-  worse than an admitted gap: a reader looking the term up in Polish finds
-  nothing, and does not know the phrase was invented. Write
-  "(brak odpowiednika)" instead.
+- A glossary line coined by translating the words one at a time is worse
+  than an admitted gap: a reader looking the term up finds nothing, and does
+  not know the phrase was invented. Write the gap marker the Glossary section
+  gives instead.
 - Write maths between $...$ inline and between $$...$$ on its own line.
   Never write \[ \] or \( \): they do not render.
 - Do not write a title heading, a figure section, or frontmatter.

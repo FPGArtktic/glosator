@@ -582,3 +582,37 @@ ran to 450–980 words without it, about 1300 tokens at most; with a list of
 answers on top, 2048 would cut notes off, and a cut note is now a failed
 chunk. 6000 tokens of chunk, about 1200 of prompt and 3072 out still fit the
 12288 context.
+
+## 2026-11-01 — Notes follow the language of their book
+
+The 2026-10-04 entry kept every note body in English, because
+`qwen2.5:32b` wrote Polish terminology badly: four of six glossary pairs
+wrong. That reasoning was about turning an English book into Polish notes,
+where every technical term has to be translated and each translation is a
+chance for a calque. A Polish book is the other case. Its terms are already
+Polish on the page; English notes from it would put the translation risk
+into every sentence instead of taking it out, and the reader studies from a
+Polish book in Polish.
+
+So notes now follow their book. An English book is unchanged: English body,
+glossary "English term — Polish term". A Polish book gets a Polish body,
+Polish headings ("W skrócie", "Wyjaśnienie", … "Ćwiczenia") and a glossary
+the other way round, "polski termin — English term", since the English term
+is the one to search for. Figure descriptions, chapter maps and the combined
+glossary follow too.
+
+The model still answers under the contract's English headings; the code
+parses those, and only `assemble` writes the localised ones. The index reads
+a note back in either language. The prompt text stays English, with the
+target language as one placeholder and the glossary rules as one file per
+direction (`glossary-en.md`, `glossary-pl.md`), so the hard rules exist once.
+
+The language is judged from the chunks: Polish when 2 % of the letters are
+ą ć ę ł ń ó ś ź ż, which Polish prose passes at about 7 % and English never
+reaches. `add --lang en|pl` overrides it, stored in a new `books.language`
+column (the fourth migration; NULL means judged from the text). Existing
+English notes do not change.
+
+Not yet measured: how well `gemma4:31b` writes Polish notes. A pilot on a
+Polish book, reviewed claim by claim as in `docs/PILOT.md`, comes before a
+full run.

@@ -129,6 +129,20 @@ def test_add_records_the_field_the_book_belongs_to() -> None:
     conn.close()
 
 
+def test_add_records_the_notes_language_or_leaves_it_to_the_book() -> None:
+    cli.main(["add", "/in/se.pdf", "--title", "Sztuka", "--slug", "se", "--lang", "pl"])
+    cli.main(["add", "/in/aoe.pdf", "--title", "Art", "--slug", "aoe"])
+    conn = db.connect()
+    rows = dict(conn.execute("SELECT slug, language FROM books").fetchall())
+    conn.close()
+    assert rows == {"se": "pl", "aoe": None}
+
+
+def test_add_refuses_a_language_it_cannot_write() -> None:
+    with pytest.raises(SystemExit):
+        cli.main(["add", "/in/b.pdf", "--title", "B", "--lang", "de"])
+
+
 def test_queue_export_needs_no_model_and_takes_page_ranges() -> None:
     cli.main(["add", "/in/book.pdf", "--title", "Book", "--slug", "bk1"])
     assert cli.main(["export", "--book", "bk1", "--pages", "71-96"]) == 0

@@ -75,16 +75,18 @@ on either side of the folding frequency.*
 [[4.06 Previous section]] · [[4.08 Next section]]
 ```
 
-The body is written in English and the glossary carries the Polish
-equivalents. This costs roughly 40 percent fewer output tokens than writing
-the whole note in Polish, while preserving the terminology needed to look a
-subject up in either language.
+Notes are written in the language of the book. An English book gets an
+English body with Polish equivalents in the glossary; a Polish book gets a
+Polish body, Polish headings, and English equivalents in the glossary, so a
+subject can be looked up in either language. The language is judged from the
+book's text; `add --lang en` or `--lang pl` sets it outright.
 
-The glossary is also the least reliable part of a note. The models write sound
-English prose and unreliable Polish terminology: on the measured note, four of
-six pairs were wrong on the Polish side while the surrounding explanation was
-correct. Read the glossary; do not learn from it. `docs/DECISIONS.md` records
-why the body is not written in Polish instead.
+The glossary is also the least reliable part of a note. A model that writes
+sound prose still renders terms badly across languages: on one measured note,
+four of six pairs were wrong on the Polish side while the surrounding
+explanation was correct. Read the glossary; do not learn from it.
+`docs/DECISIONS.md` records why an English book's notes are not written in
+Polish.
 
 ## Requirements
 
@@ -248,6 +250,12 @@ the first tag of every note.
 
 ```
 --domain "organic chemistry"   ->   tags: [organic-chemistry, chem2, chapter-04]
+```
+
+So is the language of its notes, when the text alone should not decide it:
+
+```
+--lang pl   ->   ## W skrócie … ## Słowniczek, with "polski termin — English term"
 ```
 
 ## Measured performance

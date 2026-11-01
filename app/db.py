@@ -88,6 +88,11 @@ _MIGRATIONS: tuple[str, ...] = (
     -- reaches the prompts and the first tag of every note.
     ALTER TABLE books ADD COLUMN domain TEXT;
     """,
+    """
+    -- The language the notes are written in: 'en' or 'pl'. NULL means the
+    -- language the book's text is in, judged when a stage runs.
+    ALTER TABLE books ADD COLUMN language TEXT;
+    """,
 )
 
 # Stand-in for a NULL chunk_id in lookups and in the unique index. Rows still
@@ -155,15 +160,18 @@ def upsert_book(
     pdf_path: Path,
     out_dir: Path | None = None,
     domain: str | None = None,
+    language: str | None = None,
 ) -> int:
     conn.execute(
         """
-        INSERT INTO books (slug, title, pdf_path, out_dir, domain, created)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO books (slug, title, pdf_path, out_dir, domain, language,
+                           created)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (slug) DO UPDATE SET title = excluded.title,
                                          pdf_path = excluded.pdf_path,
                                          out_dir = excluded.out_dir,
-                                         domain = excluded.domain
+                                         domain = excluded.domain,
+                                         language = excluded.language
         """,
         (
             slug,
@@ -171,6 +179,7 @@ def upsert_book(
             str(pdf_path),
             str(out_dir) if out_dir else None,
             domain,
+            language,
             _now(),
         ),
     )

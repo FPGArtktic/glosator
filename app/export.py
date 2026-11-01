@@ -20,6 +20,7 @@ from pathlib import Path
 from app import config, extract, generate, log
 from app.chunk import Chunk
 from app.extract import Figure
+from app.language import ENGLISH, Language
 
 # Under the notes folder, not beside the notes: these files are the book's own
 # text, not notes about it, and a leading underscore keeps them out of the way
@@ -142,6 +143,7 @@ def write_prompt(
     count: int,
     out_dir: Path | str | None = None,
     domain: str = config.DEFAULT_DOMAIN,
+    language: Language = ENGLISH,
 ) -> Path:
     """The instructions, once per book, beside the files they apply to."""
     text = generate.render(
@@ -150,6 +152,8 @@ def write_prompt(
         book_tag=book_tag,
         domain=extract.slugify(domain),
         count=count,
+        language=language.name,
+        glossary=generate.load_prompt(language.glossary_prompt).strip(),
     )
     return generate.write_note(
         export_root(book_tag, out_dir) / PROMPT_FILE, text, out_dir

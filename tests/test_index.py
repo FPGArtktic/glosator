@@ -10,6 +10,7 @@ import pytest
 
 from app import config, generate, index
 from app.chunk import Chunk
+from app.language import POLISH
 
 NOTE = """---
 section: "2.3.1"
@@ -184,3 +185,21 @@ def test_run_can_be_repeated() -> None:
     second = index.run(chunks, titles, book_title="Book", book_tag="bk1")
 
     assert first == second
+
+
+def test_parse_glossary_reads_a_polish_note() -> None:
+    note = (
+        "## W skrócie\n\nx\n\n## Słowniczek\n\n- wtórnik emiterowy — emitter follower\n"
+    )
+    assert index.parse_glossary(note) == [("wtórnik emiterowy", "emitter follower")]
+
+
+def test_polish_chapter_map_and_glossary_speak_polish() -> None:
+    chunks = [_chunk(1, "2.1", "Podstawy", 71)]
+    moc = index.chapter_moc(2, "Tranzystory", chunks, "Książka", "bk1", language=POLISH)
+    assert "Notatki w kolejności czytania:" in moc
+    assert "— strony 71-" in moc
+    glossary = index.glossary_note(
+        [("wtórnik", "follower", ["2.1 Podstawy"])], "Książka", "bk1", language=POLISH
+    )
+    assert "# Słowniczek" in glossary

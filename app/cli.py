@@ -13,6 +13,7 @@ from pathlib import Path
 
 from app import chunk as chunk_module
 from app import config, db, extract, worker
+from app.language import LANGUAGES
 
 STAGES = ("extract", "chunk", "generate", "vision", "index", "export")
 
@@ -53,6 +54,12 @@ def _parser() -> argparse.ArgumentParser:
         f"{config.DEFAULT_DOMAIN})",
     )
     add.add_argument(
+        "--lang",
+        choices=sorted(LANGUAGES),
+        default=None,
+        help="language of the notes (default: the language the book is in)",
+    )
+    add.add_argument(
         "--out",
         type=Path,
         default=None,
@@ -86,7 +93,7 @@ def _add(conn, args) -> int:
     slug = args.slug or extract.slugify(args.title)
     out_dir = args.out.expanduser().resolve() if args.out else None
     return db.upsert_book(
-        conn, slug, args.title, args.pdf.resolve(), out_dir, args.domain
+        conn, slug, args.title, args.pdf.resolve(), out_dir, args.domain, args.lang
     )
 
 

@@ -15,6 +15,7 @@ from pathlib import Path
 
 from app import config, generate, log, ollama
 from app.extract import Figure
+from app.language import ENGLISH, Language
 
 # Characters of surrounding source text handed to the vision model. Enough to
 # name the circuit, small enough to leave room for the image tokens.
@@ -66,6 +67,7 @@ def describe(
     context: str,
     model: str = config.VISION_MODEL,
     domain: str = config.DEFAULT_DOMAIN,
+    language: Language = ENGLISH,
 ) -> str:
     image = config.WORK_DIR / book_slug / figure.path
     if not image.exists():
@@ -76,6 +78,7 @@ def describe(
         caption=figure.caption or "none printed",
         context=context,
         domain=domain,
+        language=language.name,
     )
     return " ".join(ollama.generate(model, prompt, images=[image]).split())
 
@@ -89,10 +92,11 @@ def run(
     model: str = config.VISION_MODEL,
     out_dir: Path | str | None = None,
     domain: str = config.DEFAULT_DOMAIN,
+    language: Language = ENGLISH,
 ) -> Path:
     """Describe one figure and write the description into its note."""
     description = describe(
-        figure, book_slug, context_for(chunk_text, figure), model, domain
+        figure, book_slug, context_for(chunk_text, figure), model, domain, language
     )
     note_text = note_path.read_text(encoding="utf-8")
     updated = insert_description(note_text, Path(figure.path).name, description)

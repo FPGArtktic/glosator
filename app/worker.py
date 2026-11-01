@@ -12,12 +12,25 @@ import json
 import signal
 import sqlite3
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
 from app import chunk as chunk_module
-from app import config, db, export, extract, generate, index, log, ollama, vision
+from app import (
+    config,
+    db,
+    export,
+    extract,
+    generate,
+    index,
+    language,
+    log,
+    ollama,
+    vision,
+)
+from app.chunk import Chunk
+from app.language import Language
 
 _running = True
 
@@ -114,6 +127,14 @@ def _domain(book: sqlite3.Row) -> str:
     return book["domain"] or config.DEFAULT_DOMAIN
 
 
+def _language(book: sqlite3.Row, chunks: Sequence[Chunk]) -> Language:
+    """The language set for the book, else the one its chunks are in."""
+    texts = (item.text_path.read_text(encoding="utf-8") for item in chunks)
+    chosen = language.of_book(book["language"], texts)
+    log.event("worker", "notes language", book=book["slug"], language=chosen.code)
+    return chosen
+
+
 def _out_dir(book: sqlite3.Row) -> Path:
     """Where this book's notes go. Falls back to the configured mount."""
     return Path(book["out_dir"]) if book["out_dir"] else config.OUT_DIR
@@ -161,6 +182,7 @@ def _do_generate(conn: sqlite3.Connection, job: sqlite3.Row) -> None:
     titles = chunk_module.chapter_titles(chunks)
     figures = extract.load_figures(book["slug"])
     rows = {row["section"]: row["id"] for row in db.list_chunks(conn, job["book_id"])}
+    notes_language = _language(book, chunks)
 
     db.job_progress(conn, job["id"], 0, len(chunks))
     for position, item in enumerate(chunks, start=1):
@@ -193,6 +215,7 @@ def _do_generate(conn: sqlite3.Connection, job: sqlite3.Row) -> None:
                 figures=figures,
                 out_dir=_out_dir(book),
                 domain=_domain(book),
+                language=notes_language,
             )
         except Exception as error:
             db.stage_finish(
@@ -222,6 +245,7 @@ def _do_vision(conn: sqlite3.Connection, job: sqlite3.Row) -> None:
     titles = chunk_module.chapter_titles(chunks)
     figures = extract.load_figures(book["slug"])
     rows = {row["section"]: row["id"] for row in db.list_chunks(conn, job["book_id"])}
+    notes_language = _language(book, chunks)
 
     targets = [
         (item, figure)
@@ -254,6 +278,7 @@ def _do_vision(conn: sqlite3.Connection, job: sqlite3.Row) -> None:
                 model=model,
                 out_dir=_out_dir(book),
                 domain=_domain(book),
+                language=notes_language,
             )
         except Exception as error:
             db.stage_finish(
@@ -282,6 +307,7 @@ def _do_index(conn: sqlite3.Connection, job: sqlite3.Row) -> None:
         book_tag=book["slug"],
         out_dir=_out_dir(book),
         domain=_domain(book),
+        language=_language(book, chunks),
     )
     db.job_progress(conn, job["id"], len(written), len(written))
     db.stage_finish(conn, job["book_id"], None, "index", job["model"], db.DONE)
@@ -313,7 +339,12 @@ def _do_export(conn: sqlite3.Connection, job: sqlite3.Row) -> None:
 
     db.job_progress(conn, job["id"], 0, len(chunks))
     export.write_prompt(
-        book["title"], book["slug"], len(chunks), _out_dir(book), _domain(book)
+        book["title"],
+        book["slug"],
+        len(chunks),
+        _out_dir(book),
+        _domain(book),
+        _language(book, chunks),
     )
     for position, item in enumerate(chunks, start=1):
         if db.stop_requested(conn, job["id"]):

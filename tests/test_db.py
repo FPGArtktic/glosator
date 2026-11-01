@@ -42,6 +42,13 @@ def test_upsert_book_updates_in_place(conn) -> None:
         db.book_row(conn, 999)
 
 
+def test_upsert_book_records_the_notes_language(conn) -> None:
+    book = db.upsert_book(conn, "bk1", "Book", Path("/in/a.pdf"), language="pl")
+    assert db.book_row(conn, book)["language"] == "pl"
+    unset = db.upsert_book(conn, "bk2", "Book", Path("/in/b.pdf"))
+    assert db.book_row(conn, unset)["language"] is None
+
+
 def test_replace_chunks_overwrites_the_plan(conn) -> None:
     book = db.upsert_book(conn, "bk1", "Book", Path("/in/a.pdf"))
     db.replace_chunks(conn, book, _chunks())

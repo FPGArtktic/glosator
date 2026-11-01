@@ -14,6 +14,7 @@ from pathlib import Path
 
 from app import config, generate, log
 from app.chunk import Chunk
+from app.language import ENGLISH, Language, contract_name
 
 GLOSSARY_LINE_RE = re.compile(r"^\s*[-*]\s+(.+?)\s+[—-]\s+(.+?)\s*$")
 # The footer is the trailing "---" line plus the one link line under it.
@@ -28,7 +29,10 @@ def note_name(chunk: Chunk) -> str:
 
 def parse_glossary(note_text: str) -> list[tuple[str, str]]:
     """``- emitter follower — wtórnik emiterowy`` pairs from one note."""
-    sections = generate.split_sections(note_text)
+    sections = {
+        contract_name(heading): body
+        for heading, body in generate.split_sections(note_text).items()
+    }
     entries: list[tuple[str, str]] = []
     for line in sections.get("Glossary", "").splitlines():
         match = GLOSSARY_LINE_RE.match(line)
@@ -56,6 +60,7 @@ def glossary_note(
     book_title: str,
     book_tag: str,
     domain: str = config.DEFAULT_DOMAIN,
+    language: Language = ENGLISH,
 ) -> str:
     lines = [
         "---",
@@ -64,7 +69,7 @@ def glossary_note(
         f"generator: {generate.GENERATOR}",
         f"tags: [{generate.extract.slugify(domain)}, {book_tag}, glossary]",
         "---",
-        "# Glossary",
+        f"# {language.glossary_title}",
         "",
     ]
     for term, translation, sources in entries:
@@ -96,9 +101,11 @@ def chapter_moc(
     book_title: str,
     book_tag: str,
     domain: str = config.DEFAULT_DOMAIN,
+    language: Language = ENGLISH,
 ) -> str:
     entries = "\n".join(
-        f"- [[{note_name(chunk)}]] — pages {chunk.page_start}-{chunk.page_end}"
+        f"- [[{note_name(chunk)}]] — {language.pages} "
+        f"{chunk.page_start}-{chunk.page_end}"
         for chunk in chunks
     )
     return generate.render(
@@ -110,6 +117,7 @@ def chapter_moc(
         book_tag=book_tag,
         domain=domain,
         entries=entries,
+        reading_order=language.reading_order,
     )
 
 
@@ -121,6 +129,7 @@ def run(
     book_tag: str,
     out_dir: Path | str | None = None,
     domain: str = config.DEFAULT_DOMAIN,
+    language: Language = ENGLISH,
 ) -> list[Path]:
     """Write MOCs and the glossary, and link every note to its neighbours.
 
@@ -164,7 +173,9 @@ def run(
         )
         generate.write_note(
             moc_path,
-            chapter_moc(chapter, title, in_chapter, book_title, book_tag, domain),
+            chapter_moc(
+                chapter, title, in_chapter, book_title, book_tag, domain, language
+            ),
             out_dir,
         )
         written.append(moc_path)
@@ -177,7 +188,7 @@ def run(
     glossary_path = generate.out_root(out_dir) / GLOSSARY_NOTE
     generate.write_note(
         glossary_path,
-        glossary_note(merge_glossary(pairs), book_title, book_tag),
+        glossary_note(merge_glossary(pairs), book_title, book_tag, language=language),
         out_dir,
     )
     written.append(glossary_path)

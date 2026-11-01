@@ -7,7 +7,7 @@ tags: [{{domain}}, {{book_tag}}, chapter-{{chapter_pad}}]
 ---
 # {{chapter_pad}} {{title}}
 
-Notes in reading order:
+{{reading_order}}
 
 {{entries}}
 
