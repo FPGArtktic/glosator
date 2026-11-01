@@ -643,3 +643,74 @@ def test_a_heading_from_docling_loses_its_html_escapes() -> None:
         "1.4",
         "Current & Voltage",
     )
+
+
+LPI_OUTLINE = [
+    Bookmark("Learning Materials: LPIC-1 (101)", 0, 1),
+    Bookmark("Topic 101: System Architecture", 0, 11),
+    Bookmark("101.1 Determine and configure hardware settings", 1, 12),
+    Bookmark("101.1 Lesson 1", 2, 13),
+    Bookmark("Introduction", 3, 13),
+    Bookmark("Guided Exercises", 3, 24),
+    Bookmark("101.1 Lesson 2", 2, 26),
+    Bookmark("Introduction", 3, 26),
+    Bookmark("101.2 Boot the system", 1, 29),
+    Bookmark("101.2 Lesson 1", 2, 30),
+    Bookmark("Introduction", 3, 30),
+]
+
+
+def test_an_outline_with_unnumbered_children_of_sections_is_deep() -> None:
+    assert chunk_module.is_deep_outline(LPI_OUTLINE)
+    shallow = [
+        Bookmark("2 Transistors", 0, 10),
+        Bookmark("2.1 Basics", 1, 11),
+        Bookmark("Appendix A", 0, 90),
+    ]
+    assert not chunk_module.is_deep_outline(shallow)
+
+
+def test_section_ranges_give_each_section_its_children_and_its_own_title() -> None:
+    assert chunk_module.section_ranges(LPI_OUTLINE, 44) == [
+        ("Learning Materials: LPIC-1 (101)", 1, 11),
+        ("101.1 Determine and configure hardware settings", 12, 28),
+        ("101.2 Boot the system", 29, 44),
+    ]
+
+
+def test_balanced_split_keeps_the_count_and_evens_the_slices(monkeypatch) -> None:
+    # Eleven pages a tenth of the budget each: greedy cuts 10 + 1 pages,
+    # balanced cuts the same two slices of five and six.
+    page = "x" * (config.CHUNK_MAX_TOKENS * config.CHARS_PER_TOKEN // 10 - 8)
+    monkeypatch.setattr(chunk_module.pdf, "page_text", lambda _p, _f, _l: page)
+    slices = chunk_module.balanced_split(
+        Path("/b.pdf"), 1, 11, chunk_module.note_budget(), "bk1"
+    )
+    assert len(slices) == 2
+    sizes = [last - first + 1 for first, last in slices]
+    assert max(sizes) - min(sizes) <= 1
+
+
+def test_plan_of_a_deep_outline_names_every_part_after_its_section(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    page = "x" * (config.CHUNK_MAX_TOKENS * config.CHARS_PER_TOKEN // 8)
+    monkeypatch.setattr(chunk_module.pdf, "page_count", lambda _path: 44)
+    monkeypatch.setattr(chunk_module.pdf, "read_toc", lambda _path: LPI_OUTLINE)
+    # Pages 1-11 are the title page and the topic page: a line each.
+    monkeypatch.setattr(
+        chunk_module.pdf,
+        "page_text",
+        lambda _p, first, _last: "Topic 101" if first <= 11 else page,
+    )
+    chunks = chunk_module.plan("bk1", Path("/nonexistent/book.pdf"))
+
+    titles = [(chunk.section, chunk.title) for chunk in chunks]
+    assert titles[0] == ("101.1", "Determine and configure hardware settings")
+    assert titles[1] == (
+        "101.1-2",
+        "Determine and configure hardware settings (continued)",
+    )
+    assert ("101.2", "Boot the system") in titles
+    # The title page and the topic page hold no section and make no note.
+    assert all("Learning Materials" not in title for _section, title in titles)

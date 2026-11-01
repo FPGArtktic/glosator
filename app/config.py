@@ -53,6 +53,9 @@ OLLAMA_KEEP_ALIVE: str = "30m"
 # section is never split, even when it exceeds MAX.
 CHUNK_MIN_TOKENS: int = 3000
 CHUNK_MAX_TOKENS: int = 6000
+# A chunk of a deep outline with less source than this is a title page or a
+# bare contents, not a section, and is left out of the plan.
+CHUNK_SKIP_TOKENS: int = 150
 
 # The same budget for the export stage, which writes files for a model that
 # is not this machine's. Nothing has to fit in 4 GB of VRAM there, so the

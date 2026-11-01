@@ -36,6 +36,9 @@ RUNNING_HEAD_RE = re.compile(
 CONTENTS_LEADER_RE = re.compile(r"(?:\.\s?){4,}")
 CONTENTS_ENTRY_RE = re.compile(r"^[^\n]*?(?:\.\s?){4,}\s*\d{1,4}[ \t]*$", re.MULTILINE)
 PAGE_SEPARATOR = "\n\n"
+CONTINUED = " (continued)"
+# balanced_split raises its trial ceiling by a twentieth at a time.
+BALANCE_STEP_DIVISOR = 20
 CHUNKS_JSON = "chunks.json"
 EXPORT_CHUNKS_JSON = "chunks-export.json"
 
@@ -210,7 +213,7 @@ def identify(
         return int(number.split(".")[0]), number, title
     if carried and _same_chapter(carried[0], span.chapter):
         number, title = carried
-        return int(number.split(".")[0]), number, f"{title} (continued)"
+        return int(number.split(".")[0]), number, f"{title}{CONTINUED}"
     return span.chapter, f"{order:03d}", section_title(span.title)
 
 
@@ -309,6 +312,135 @@ def spans_from_bookmarks(
         return spans
     wanted = {title.strip() for title in selected}
     return [span for span in spans if span.title.strip() in wanted]
+
+
+def is_deep_outline(bookmarks: Sequence[Bookmark]) -> bool:
+    """True when numbered sections have unnumbered bookmarks below them.
+
+    The LPI learning materials number each objective ("101.1 Determine and
+    configure hardware settings") and hang "Lesson 1", "Introduction", "Guided
+    Exercises" and the topics of the lesson under it, unnumbered. Every such
+    title repeats in every lesson, and the children share their pages with
+    each other, so a span per bookmark reads the same page into several
+    chunks and names a chunk "003 Introduction".
+    """
+    numbered_above: list[tuple[int, bool]] = []
+    for mark in bookmarks:
+        while numbered_above and numbered_above[-1][0] >= mark.level:
+            numbered_above.pop()
+        is_numbered = section_number(mark.title) is not None
+        if not is_numbered and any(numbered for _level, numbered in numbered_above):
+            return True
+        numbered_above.append((mark.level, is_numbered))
+    return False
+
+
+def section_ranges(
+    bookmarks: Sequence[Bookmark], page_count: int
+) -> list[tuple[str, int, int]]:
+    """One page range per numbered section of a deep outline, children included.
+
+    An unnumbered bookmark belongs to the numbered section before it, and so
+    does a numbered one that repeats the section's number ("101.1 Lesson 2"
+    under "101.1 Determine and configure hardware settings"), so the title is
+    always the section's own. A range ends where the next section begins.
+    Bookmarks before the first numbered one keep their own titles.
+    """
+    owners: list[tuple[str, int]] = []
+    for mark in sorted(bookmarks, key=lambda mark: mark.page):
+        number = section_number(mark.title)
+        current = section_number(owners[-1][0]) if owners else None
+        if not owners or (number is not None and number != current):
+            owners.append((mark.title, mark.page))
+    ranges: list[tuple[str, int, int]] = []
+    for index, (title, first_page) in enumerate(owners):
+        following = owners[index + 1][1] if index + 1 < len(owners) else None
+        last_page = page_count if following is None else max(following - 1, first_page)
+        ranges.append((title, first_page, last_page))
+    return ranges
+
+
+def section_spans(
+    pdf_path: Path,
+    bookmarks: Sequence[Bookmark],
+    page_count: int,
+    sizes: Budget,
+    book_slug: str,
+    selected: Sequence[str] | None = None,
+) -> list[Span]:
+    """Spans of a deep outline: a section per range, cut to the budget.
+
+    A section of the LPI materials is two lessons with their exercises and
+    answers, three times the budget, so it is cut by pages like an operator's
+    range. Every part keeps the section's title, and the plan marks all but
+    the first "(continued)".
+    """
+    wanted = {title.strip() for title in selected} if selected else None
+    return [
+        Span(title, 0, start, end)
+        for title, first_page, last_page in section_ranges(bookmarks, page_count)
+        if wanted is None or title.strip() in wanted
+        for start, end in balanced_split(
+            pdf_path, first_page, last_page, sizes, book_slug
+        )
+    ]
+
+
+def balanced_split(
+    pdf_path: Path, first_page: int, last_page: int, sizes: Budget, book_slug: str
+) -> list[tuple[int, int]]:
+    """The fewest slices the budget allows, made as even as the pages permit.
+
+    Cut greedily, a section of 6300 tokens is one note of 6000 and one of 300
+    about a single page. The same number of slices under a lower ceiling
+    gives two notes of about 3000, so the ceiling is lowered in steps until
+    the count would grow.
+    """
+
+    def cut(ceiling: int) -> list[tuple[int, int]]:
+        return split_to_budget(
+            pdf_path,
+            first_page,
+            last_page,
+            max_tokens=ceiling,
+            min_tokens=min(sizes.min_tokens, ceiling),
+            book_slug=book_slug,
+        )
+
+    greedy = cut(sizes.max_tokens)
+    if len(greedy) < 2:
+        return greedy
+    total = estimate_tokens(readable_text(pdf_path, first_page, last_page, book_slug))
+    ceiling = total // len(greedy)
+    while ceiling < sizes.max_tokens:
+        even = cut(ceiling)
+        if len(even) == len(greedy):
+            return even
+        ceiling += max(1, ceiling // BALANCE_STEP_DIVISOR)
+    return greedy
+
+
+def _drop_empty(
+    groups: list[list[Span]], text_by_span: dict[Span, str], book_slug: str
+) -> list[list[Span]]:
+    """Leave out a chunk with next to no text: a title page, a bare contents.
+
+    The model would be asked for a note about nothing, and writes one.
+    """
+    kept = []
+    for group in groups:
+        tokens = sum(estimate_tokens(text_by_span[span]) for span in group)
+        if tokens >= config.CHUNK_SKIP_TOKENS:
+            kept.append(group)
+            continue
+        log.event(
+            "chunk",
+            "chunk too small; skipped",
+            book=book_slug,
+            title=group[0].title,
+            tokens=tokens,
+        )
+    return kept
 
 
 def split_to_budget(
@@ -442,6 +574,7 @@ def plan(
     """Build the chunk plan and write one text file per chunk."""
     sizes = budget or note_budget()
     page_total = pdf.page_count(pdf_path)
+    by_section = False
     if page_ranges:
         bookmarks = pdf.read_toc(pdf_path)
         spans = [
@@ -462,11 +595,22 @@ def plan(
         bookmarks = pdf.read_toc(pdf_path)
         for problem in outline_problems(bookmarks):
             log.event("chunk", "outline problem", book=book_slug, problem=problem)
-        spans = spans_from_bookmarks(bookmarks, page_total, selected)
+        by_section = is_deep_outline(bookmarks)
+        spans = (
+            section_spans(pdf_path, bookmarks, page_total, sizes, book_slug, selected)
+            if by_section
+            else spans_from_bookmarks(bookmarks, page_total, selected)
+        )
     if not spans:
         raise ValueError("no bookmarks selected and no page ranges given")
 
-    texts = [span_text(book_slug, pdf_path, span) for span in spans]
+    by_pages = bool(page_ranges) or by_section
+    texts = [
+        readable_text(pdf_path, span.page_start, span.page_end, book_slug)
+        if by_pages
+        else span_text(book_slug, pdf_path, span)
+        for span in spans
+    ]
     # Page ranges are boundaries the operator drew: they are never merged
     # across, and split_to_budget has already cut them to a readable size.
     if page_ranges:
@@ -476,6 +620,8 @@ def plan(
             spans, [estimate_tokens(text) for text in texts], budget=sizes
         )
     text_by_span = dict(zip(spans, texts, strict=True))
+    if by_section:
+        groups = _drop_empty(groups, text_by_span, book_slug)
 
     chunk_dir = config.WORK_DIR / book_slug / sizes.subdir
     chunk_dir.mkdir(parents=True, exist_ok=True)
@@ -487,6 +633,8 @@ def plan(
         head = group[0]
         text = "\n\n".join(text_by_span[span] for span in group).strip()
         chapter, number, title = identify(head, text, order, carried)
+        if number in used and not title.endswith(CONTINUED):
+            title = f"{title}{CONTINUED}"
         carried = next(reversed(headings(text, head.chapter)), carried)
         section = _unique(number, used)
         text_path = chunk_dir / f"{order:03d}-{extract.slugify(section)}.md"

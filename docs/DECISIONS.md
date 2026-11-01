@@ -538,3 +538,25 @@ mapping, a CAD schematic, an NTSC waveform and a photograph
 Wrong values are what this pass must not add to a note, so `gemma4:26b` is
 the vision model. It is also already the fast text model, so a book needs
 one model family and nothing extra pulled.
+
+## 2026-11-01 — A deep outline is chunked by section, through pages
+
+The LPI learning materials have a clean outline, deeper than glosator
+expected: each objective is numbered ("101.1 Determine and configure hardware
+settings"), and under it hang "101.1 Lesson 1", "Introduction", the lesson's
+topics, "Guided Exercises" and "Answers…", all unnumbered or repeating the
+objective's number. A span per bookmark read the same pages into several
+chunks, because children share pages, and named chunks "003 Introduction";
+slicing the extracted markdown by title would find the first "Introduction"
+of the book every time.
+
+An outline where an unnumbered bookmark sits below a numbered one is now
+chunked by section: one page range per numbered section, everything below it
+included, read from the pages like an operator's range and cut to the budget.
+Every part carries the section's title, later parts "(continued)". The cut
+keeps the fewest parts the budget allows and evens them out, so a section of
+6300 tokens is two notes of about 3000 rather than 6000 and a page. Chunks
+under 150 tokens (a title page, a topic's cover) are left out.
+
+Outlines like The Art of Electronics', numbered to the subsection, keep the
+span-per-bookmark plan.
