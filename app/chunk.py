@@ -71,12 +71,17 @@ def export_budget() -> Budget:
 
 @dataclass(frozen=True)
 class Span:
-    """A bookmark and the page range it owns."""
+    """A bookmark and the page range it owns.
+
+    ``outline_chapter`` is the chapter the outline puts the first page in. It
+    is the only chapter a page-range span has when its title is "pages 9-20".
+    """
 
     title: str
     level: int
     page_start: int
     page_end: int
+    outline_chapter: int | None = None
 
     @property
     def section(self) -> str | None:
@@ -85,9 +90,10 @@ class Span:
     @property
     def chapter(self) -> int | None:
         number = self.section
-        return (
-            int(number.split(".")[0]) if number else extract.chapter_number(self.title)
-        )
+        if number:
+            return int(number.split(".")[0])
+        from_title = extract.chapter_number(self.title)
+        return from_title if from_title is not None else self.outline_chapter
 
 
 @dataclass(frozen=True)
@@ -113,7 +119,7 @@ def section_title(title: str) -> str:
     return match.group(2) if match else title.strip()
 
 
-def running_head(text: str) -> tuple[str, str] | None:
+def running_head(text: str, chapter: int | None = None) -> tuple[str, str] | None:
     """Section number and title from the running head, or ``None``.
 
     The head repeats on every page of a section, so the number seen most often
@@ -121,7 +127,7 @@ def running_head(text: str) -> tuple[str, str] | None:
     """
     counts: Counter[str] = Counter()
     titles: dict[str, str] = {}
-    for number, title in headings(text):
+    for number, title in headings(text, chapter):
         counts[number] += 1
         titles.setdefault(number, title)
     if not counts:
@@ -130,13 +136,21 @@ def running_head(text: str) -> tuple[str, str] | None:
     return number, titles[number]
 
 
-def headings(text: str) -> list[tuple[str, str]]:
-    """Every numbered heading line in the text, in order, as (number, title)."""
+def headings(text: str, chapter: int | None = None) -> list[tuple[str, str]]:
+    """Every numbered heading line in the text, in order, as (number, title).
+
+    With ``chapter`` known from the outline, a number from another chapter is
+    not a heading of this text: it is a value ("0.25 - 0.3V") or a reference
+    that happened to start a line.
+    """
     found: list[tuple[str, str]] = []
     for match in RUNNING_HEAD_RE.finditer(text):
         number, title = _reunite_split_number(match.group(1), match.group(2).strip())
-        if is_heading_title(title):
-            found.append((number, title))
+        if not is_heading_title(title):
+            continue
+        if chapter is not None and int(number.split(".")[0]) != chapter:
+            continue
+        found.append((number, title))
     return found
 
 
@@ -145,12 +159,14 @@ def is_heading_title(title: str) -> bool:
 
     A contents entry carries leader dots out to its page number, and became
     a note title once, dots and all. A sentence wrapped after a figure number
-    ("Figure\n6.3 shows an excerpt ...") starts lower case; a heading never
-    does.
+    ("Figure\n6.3 shows an excerpt ...") starts lower case, and one wrapped
+    inside a caption starts with a bracket or a dash; a heading starts with a
+    capital or a digit.
     """
     if CONTENTS_LEADER_RE.search(title):
         return False
-    return not title[:1].islower()
+    first = title[:1]
+    return first.isalnum() and not first.islower()
 
 
 def _reunite_split_number(number: str, title: str) -> tuple[str, str]:
@@ -167,20 +183,52 @@ def _reunite_split_number(number: str, title: str) -> tuple[str, str]:
     return number, title
 
 
-def identify(span: Span, text: str, order: int) -> tuple[int | None, str, str]:
+def identify(
+    span: Span,
+    text: str,
+    order: int,
+    carried: tuple[str, str] | None = None,
+) -> tuple[int | None, str, str]:
     """Chapter, section number and title for a chunk.
 
     A numbered bookmark answers it outright. Otherwise the running head in the
     chunk's own text does, which is what a book with a damaged outline leaves
-    us. Failing both, the chunk is numbered by its position.
+    us. A chunk with no head of its own continues ``carried``, the last head
+    the chunks before it showed, as long as the outline puts both in the same
+    chapter. Failing all of that, the chunk is numbered by its position.
     """
     if span.section:
         return span.chapter, span.section, section_title(span.title)
-    head = running_head(text)
+    head = running_head(text, span.chapter)
     if head:
         number, title = head
         return int(number.split(".")[0]), number, title
+    if carried and _same_chapter(carried[0], span.chapter):
+        number, title = carried
+        return int(number.split(".")[0]), number, f"{title} (continued)"
     return span.chapter, f"{order:03d}", section_title(span.title)
+
+
+def _same_chapter(number: str, chapter: int | None) -> bool:
+    return chapter is None or int(number.split(".")[0]) == chapter
+
+
+def outline_chapter(bookmarks: Sequence[Bookmark], page: int) -> int | None:
+    """Chapter of the last numbered chapter bookmark at or before ``page``.
+
+    A book whose outline names only its chapters ("Chapter 2 - Basic Analog
+    Circuit Analysis") cannot drive chunking, but it still says which chapter
+    a page is in, and a note without a chapter lands outside every chapter
+    folder.
+    """
+    chapter = None
+    for mark in sorted(bookmarks, key=lambda mark: mark.page):
+        if mark.page > page:
+            break
+        number = extract.chapter_number(mark.title)
+        if number is not None:
+            chapter = number
+    return chapter
 
 
 def is_contents_page(text: str) -> bool:
@@ -354,8 +402,11 @@ def plan(
     sizes = budget or note_budget()
     page_total = pdf.page_count(pdf_path)
     if page_ranges:
+        bookmarks = pdf.read_toc(pdf_path)
         spans = [
-            Span(f"pages {start}-{end}", 0, start, end)
+            Span(
+                f"pages {start}-{end}", 0, start, end, outline_chapter(bookmarks, start)
+            )
             for first_page, last_page in page_ranges
             for start, end in split_to_budget(
                 pdf_path, first_page, last_page, max_tokens=sizes.max_tokens
@@ -385,10 +436,12 @@ def plan(
 
     chunks: list[Chunk] = []
     used: set[str] = set()
+    carried: tuple[str, str] | None = None
     for order, group in enumerate(groups, start=1):
         head = group[0]
         text = "\n\n".join(text_by_span[span] for span in group).strip()
-        chapter, number, title = identify(head, text, order)
+        chapter, number, title = identify(head, text, order, carried)
+        carried = next(reversed(headings(text, head.chapter)), carried)
         section = _unique(number, used)
         text_path = chunk_dir / f"{order:03d}-{extract.slugify(section)}.md"
         text_path.write_text(text + "\n", encoding="utf-8")

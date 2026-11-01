@@ -14,6 +14,12 @@ from app.chunk import Chunk, Span
 from app.pdf import Bookmark
 
 
+@pytest.fixture(autouse=True)
+def no_outline(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Page-range plans read the outline for chapters; the test PDFs have none."""
+    monkeypatch.setattr(chunk_module.pdf, "read_toc", lambda _path: [])
+
+
 def test_section_number_and_title() -> None:
     assert chunk_module.section_number("2.3.1 Emitter follower") == "2.3.1"
     assert chunk_module.section_title("2.3.1 Emitter follower") == "Emitter follower"
@@ -280,6 +286,16 @@ def test_running_head_skips_a_sentence_wrapped_after_a_figure_number() -> None:
     assert chunk_module.running_head(text) is None
 
 
+def test_running_head_skips_a_line_wrapped_inside_a_caption() -> None:
+    text = "Figure\n9.29 (with highlighting on changed pins)\n"
+    assert chunk_module.running_head(text) is None
+
+
+def test_running_head_skips_a_number_from_another_chapter() -> None:
+    text = "0.25 - 0.3V and finally the signal\n9.6 Video\n"
+    assert chunk_module.running_head(text, chapter=9) == ("9.6", "Video")
+
+
 def test_headings_are_listed_in_page_order() -> None:
     text = "1.4 Current & Voltage\nbody\n1.5 Units\nbody\n1.6 Power\n"
     assert [number for number, _title in chunk_module.headings(text)] == [
@@ -503,3 +519,58 @@ def test_readable_text_leaves_out_contents_pages(monkeypatch) -> None:
         chunk_module.pdf, "page_text", lambda _p, first, _last: pages[first]
     )
     assert chunk_module.readable_text(Path("/b.pdf"), 1, 2) == pages[2]
+
+
+def test_outline_chapter_is_the_last_chapter_bookmark_before_the_page() -> None:
+    bookmarks = [
+        Bookmark("Chapter 1 - Introduction to Electronics", 0, 1),
+        Bookmark("1: Table of Contents", 1, 9),
+        Bookmark("Chapter 2 - Basic Analog Circuit Analysis", 0, 72),
+    ]
+    assert chunk_module.outline_chapter(bookmarks, 40) == 1
+    assert chunk_module.outline_chapter(bookmarks, 72) == 2
+    assert chunk_module.outline_chapter([], 40) is None
+
+
+def test_a_page_range_span_takes_its_chapter_from_the_outline() -> None:
+    assert Span("pages 80-90", 0, 80, 90, outline_chapter=2).chapter == 2
+
+
+def test_identify_continues_the_previous_head() -> None:
+    span = Span("pages 30-41", 0, 30, 41, outline_chapter=1)
+    assert chunk_module.identify(span, "body only", 4, ("1.7", "Resistors")) == (
+        1,
+        "1.7",
+        "Resistors (continued)",
+    )
+
+
+def test_identify_does_not_carry_a_head_into_another_chapter() -> None:
+    span = Span("pages 80-90", 0, 80, 90, outline_chapter=2)
+    assert chunk_module.identify(span, "body only", 9, ("1.9", "Summary")) == (
+        2,
+        "009",
+        "pages 80-90",
+    )
+
+
+def test_plan_names_a_headless_chunk_after_the_section_it_continues(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = {1: "1.6 Power\nbody", 2: "1.7 Resistors\nbody", 3: "more body"}
+    page = "x" * (config.CHUNK_MAX_TOKENS // 2 * config.CHARS_PER_TOKEN)
+    monkeypatch.setattr(chunk_module.pdf, "page_count", lambda _path: 3)
+    monkeypatch.setattr(
+        chunk_module.pdf,
+        "page_text",
+        lambda _p, first, _last: pages[first] + "\n" + page,
+    )
+    chunks = chunk_module.plan(
+        "bk1", Path("/nonexistent/book.pdf"), page_ranges=[(1, 3)]
+    )
+    # Every page is half the budget, so each one is a chunk of its own.
+    assert [(chunk.section, chunk.title) for chunk in chunks] == [
+        ("1.6", "Power"),
+        ("1.7", "Resistors"),
+        ("1.7-2", "Resistors (continued)"),
+    ]
