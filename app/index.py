@@ -23,7 +23,7 @@ GLOSSARY_NOTE = "_Glossary.md"
 
 def note_name(chunk: Chunk) -> str:
     """Wikilink target of a chunk's note: the file stem."""
-    return f"{chunk.section} {chunk.title}".strip()
+    return generate.note_stem(chunk)
 
 
 def parse_glossary(note_text: str) -> list[tuple[str, str]]:
@@ -158,7 +158,7 @@ def run(
     for chapter in sorted({chunk.chapter for chunk, _ in present if chunk.chapter}):
         in_chapter = [chunk for chunk, _ in present if chunk.chapter == chapter]
         title = chapter_titles.get(chapter, "")
-        moc_name = f"{chapter:02d} {title}".strip()
+        moc_name = generate.file_stem(f"{chapter:02d} {title}")
         moc_path = (
             generate.note_path(in_chapter[0], title, out_dir).parent / f"{moc_name}.md"
         )

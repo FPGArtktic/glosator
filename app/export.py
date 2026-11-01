@@ -45,9 +45,8 @@ def file_path(
     The chapter folders mirror the notes tree, so a section is in the same
     place in both.
     """
-    name = f"{chunk.section} {chunk.title}".strip()
     folder = generate.chapter_folder(chunk, chapter_title)
-    return export_root(book_tag, out_dir) / folder / f"{name}.md"
+    return export_root(book_tag, out_dir) / folder / f"{generate.note_stem(chunk)}.md"
 
 
 def frontmatter(

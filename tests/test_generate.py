@@ -281,8 +281,31 @@ def test_write_note_refuses_a_path_outside_the_output_folder(tmp_path: Path) -> 
 
 def test_note_path_cannot_escape_the_output_folder() -> None:
     sneaky = Chunk(1, 2, "../../../etc", "passwd", 1, 2, Path("x.md"))
-    with pytest.raises(PermissionError, match="outside the output folder"):
-        generate.check_writable(generate.note_path(sneaky, "Transistors"))
+    path = generate.note_path(sneaky, "Transistors")
+    assert path.parent == config.OUT_DIR / "02-transistors"
+    generate.check_writable(path)
+
+
+def test_note_path_keeps_a_slashed_title_in_one_file() -> None:
+    # "6.3 SSI / MSI Blocks" made a directory "6.3 SSI " in the first full run.
+    chunk = Chunk(1, 6, "6.3", "SSI / MSI Blocks", 1, 2, Path("x.md"))
+    path = generate.note_path(chunk, "")
+    assert path == config.OUT_DIR / "06" / "6.3 SSI-MSI Blocks.md"
+
+
+@pytest.mark.parametrize(
+    ("title", "stem"),
+    [
+        ("Framework for TTL/CMOS Logic", "Framework for TTL-CMOS Logic"),
+        ("What is Circuit Analysis?", "What is Circuit Analysis"),
+        ("Current & Voltage", "Current & Voltage"),
+        ('Tips: "Fast" <loops> | #1 [^a]', "Tips Fast loops-1 a"),
+    ],
+)
+def test_file_stem_drops_what_a_file_name_or_wikilink_cannot_hold(
+    title: str, stem: str
+) -> None:
+    assert generate.file_stem(title) == stem
 
 
 def test_claim_dir_refuses_a_directory_it_does_not_own() -> None:

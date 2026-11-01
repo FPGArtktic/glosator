@@ -28,6 +28,12 @@ MATH_DISPLAY_RE = re.compile(r"\\\[(.+?)\\\]", re.DOTALL)
 MATH_INLINE_RE = re.compile(r"\\\((.+?)\\\)", re.DOTALL)
 SECTION_RE = re.compile(r"^##\s+(.*\S)\s*$", re.MULTILINE)
 
+# A section title becomes a file name and a wikilink target. A slash in it
+# ("SSI / MSI Blocks", "TTL/CMOS") would make a directory; the rest are
+# refused by Obsidian on Windows or Android, or end a wikilink early.
+NAME_SEPARATOR_RE = re.compile(r"\s*[/\\|]\s*")
+NAME_FORBIDDEN_RE = re.compile(r'[:*?"<>#^\[\]]')
+
 # Order of the output contract in CLAUDE.md. "Figures" is inserted by this
 # module; the rest comes from the model.
 # Written into every note's frontmatter and checked before any overwrite: a
@@ -183,6 +189,17 @@ def chapter_folder(chunk: Chunk, chapter_title: str) -> str:
     return f"{chunk.chapter:02d}"
 
 
+def file_stem(text: str) -> str:
+    """``text`` made safe as a file name and a wikilink target."""
+    name = NAME_FORBIDDEN_RE.sub("", NAME_SEPARATOR_RE.sub("-", text))
+    return " ".join(name.split())
+
+
+def note_stem(chunk: Chunk) -> str:
+    """File stem of a chunk's per-chunk outputs: ``<section> <Title>``."""
+    return file_stem(f"{chunk.section} {chunk.title}")
+
+
 def note_path(
     chunk: Chunk, chapter_title: str, out_dir: Path | str | None = None
 ) -> Path:
@@ -191,8 +208,8 @@ def note_path(
     The output folder is an ordinary directory chosen by the user; it does not
     have to be an Obsidian vault (see docs/DECISIONS.md).
     """
-    name = f"{chunk.section} {chunk.title}".strip()
-    return out_root(out_dir) / chapter_folder(chunk, chapter_title) / f"{name}.md"
+    folder = chapter_folder(chunk, chapter_title)
+    return out_root(out_dir) / folder / f"{note_stem(chunk)}.md"
 
 
 def is_ours_text(text: str) -> bool:
