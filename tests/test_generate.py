@@ -66,6 +66,15 @@ def test_note_prompt_has_no_leftover_placeholders(chunk: Chunk) -> None:
     assert "2.3.1" in prompt
 
 
+@pytest.mark.parametrize("name", ["note.md", "export.md"])
+def test_both_prompts_forbid_a_glossary_calque(name: str) -> None:
+    # gemma4:31b's only glossary faults in tachygraf were calques: English
+    # words translated one at a time into a phrase no Polish textbook uses.
+    prompt = generate.load_prompt(name)
+    assert "one at a time" in prompt
+    assert "obszar zubożony" in prompt
+
+
 def test_split_sections_and_required_sections() -> None:
     sections = generate.split_sections(MODEL_OUTPUT)
     assert set(sections) == {

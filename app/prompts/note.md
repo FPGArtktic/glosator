@@ -32,7 +32,11 @@ below, whatever field it belongs to.
 
 The right-hand side must be Polish. An English definition there is wrong.
 List terms, never symbols or variables: write "collector current", not "IC".
-If you do not know the Polish equivalent, write: term — (brak odpowiednika)
+Give the established Polish term, the one a Polish textbook on the subject
+uses. Do not translate the English words one at a time: "depletion region" is
+"obszar zubożony", not "obszar dezaktywacji", and "reverse bias" is
+"polaryzacja zaporowa", not "przewodzenie wsteczne". If you do not know the
+established term, write: term — (brak odpowiednika)
 
 ## Pitfalls
 Mistakes or misconceptions the source warns about. Omit this whole section if
@@ -61,6 +65,10 @@ made a note that reads well and teaches something false:
   quantity rises or falls with another. If you are about to write the opposite
   of the source because it sounds more familiar, write what the source says.
 - Copy every component value and part number exactly as written.
+- A glossary line coined by translating the English words one at a time is
+  worse than an admitted gap: a reader looking the term up in Polish finds
+  nothing, and does not know the phrase was invented. Write
+  "(brak odpowiednika)" instead.
 - Write maths between $...$ inline and between $$...$$ on its own line.
   Never write \[ \] or \( \): they do not render.
 - Do not write a title heading, a figure section, or frontmatter.
