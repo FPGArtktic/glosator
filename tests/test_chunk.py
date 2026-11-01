@@ -616,3 +616,30 @@ def test_split_to_budget_counts_the_separators_between_pages(monkeypatch) -> Non
     for first, last in slices:
         joined = chunk_module.readable_text(Path("/b.pdf"), first, last)
         assert chunk_module.estimate_tokens(joined) <= config.CHUNK_MAX_TOKENS
+
+
+def test_split_to_budget_ends_a_slice_where_a_section_starts(monkeypatch) -> None:
+    # Pages of a quarter of the budget: past the minimum after two pages, the
+    # slice ends before the page that opens 1.5 instead of running to four.
+    body = "x" * (config.CHUNK_MAX_TOKENS * config.CHARS_PER_TOKEN // 4 - 40)
+    pages = {
+        1: "1.4 Current\n" + body,
+        2: body,
+        3: body,
+        4: "1.5 Units\n" + body,
+        5: body,
+    }
+    monkeypatch.setattr(
+        chunk_module.pdf, "page_text", lambda _p, first, _last: pages[first]
+    )
+    slices = chunk_module.split_to_budget(
+        Path("/b.pdf"), 1, 5, min_tokens=config.CHUNK_MAX_TOKENS // 2
+    )
+    assert slices == [(1, 3), (4, 5)]
+
+
+def test_a_heading_from_docling_loses_its_html_escapes() -> None:
+    assert chunk_module.running_head("## 1.4 Current &amp; Voltage\n") == (
+        "1.4",
+        "Current & Voltage",
+    )

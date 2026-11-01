@@ -9,6 +9,7 @@ a note are merged with the ones that follow them, up to the token budget in
 
 from __future__ import annotations
 
+import html
 import itertools
 import json
 import re
@@ -147,7 +148,9 @@ def headings(text: str, chapter: int | None = None) -> list[tuple[str, str]]:
     """
     found: list[tuple[str, str]] = []
     for match in RUNNING_HEAD_RE.finditer(text):
-        number, title = _reunite_split_number(match.group(1), match.group(2).strip())
+        # docling writes "&" as "&amp;"; a title is a file name, not HTML.
+        title = html.unescape(match.group(2).strip())
+        number, title = _reunite_split_number(match.group(1), title)
         if not is_heading_title(title):
             continue
         if chapter is not None and int(number.split(".")[0]) != chapter:
@@ -314,6 +317,7 @@ def split_to_budget(
     last_page: int,
     *,
     max_tokens: int | None = None,
+    min_tokens: int | None = None,
     book_slug: str | None = None,
 ) -> list[tuple[int, int]]:
     """Cut a page range into consecutive slices that fit the token budget.
@@ -322,20 +326,31 @@ def split_to_budget(
     textbook are five times what the model can read at once. Pages are never
     split, so a single page over the budget stays whole and the generate stage
     refuses it.
+
+    Once a slice holds ``min_tokens``, it also ends before a page on which a
+    numbered section starts. A slice cut only at the ceiling carries the end
+    of one section and the start of the third after it, and its note, at most
+    700 words, then covers a dozen pages of several subjects and leaves most
+    of them out.
     """
     ceiling = max_tokens if max_tokens is not None else config.CHUNK_MAX_TOKENS
     # Measured in characters, as estimate_tokens measures the joined chunk,
     # and with the separator each page adds to the join. Rounding every page
     # down to whole tokens let a chunk of fifteen pages end 8 tokens over.
     ceiling_chars = ceiling * config.CHARS_PER_TOKEN
-    sizes = {}
+    floor_chars = (min_tokens or ceiling) * config.CHARS_PER_TOKEN
+    sizes: dict[int, int] = {}
+    opens_section: dict[int, bool] = {}
     for page in range(first_page, last_page + 1):
         text = readable_text(pdf_path, page, page, book_slug)
         sizes[page] = len(text) + len(PAGE_SEPARATOR) if text else 0
+        opens_section[page] = bool(headings(text))
     slices: list[tuple[int, int]] = []
     start, total = first_page, 0
     for page in range(first_page, last_page + 1):
-        if total and total + sizes[page] > ceiling_chars:
+        full = total + sizes[page] > ceiling_chars
+        at_section = total >= floor_chars and opens_section[page]
+        if total and (full or at_section):
             slices.append((start, page - 1))
             start, total = page, 0
         total += sizes[page]
@@ -439,6 +454,7 @@ def plan(
                 first_page,
                 last_page,
                 max_tokens=sizes.max_tokens,
+                min_tokens=sizes.min_tokens,
                 book_slug=book_slug,
             )
         ]
