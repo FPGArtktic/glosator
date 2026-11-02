@@ -258,6 +258,15 @@ So is the language of its notes, when the text alone should not decide it:
 --lang pl   ->   ## W skrócie … ## Słowniczek, with "polski termin — English term"
 ```
 
+A programming book keeps its code. With `--domain programming`, extraction
+rebuilds each listing's lines and indentation from the PDF's text layer, and
+its notes carry a `Code` section, with the listings copied verbatim, in place
+of `Formulas`:
+
+```
+--domain programming   ->   ## Explanation … ## Code (```c … ```) … ## Glossary
+```
+
 ## Measured performance
 
 Measured on the reference machine: RTX 3050 Mobile with 4 GB of VRAM, 64 GB of

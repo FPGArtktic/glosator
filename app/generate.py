@@ -16,7 +16,7 @@ from collections.abc import Sequence
 from datetime import date
 from pathlib import Path
 
-from app import config, extract, log, ollama
+from app import config, extract, listing, log, ollama
 from app.chunk import Chunk, estimate_tokens
 from app.extract import Figure
 from app.language import ENGLISH, Language
@@ -48,6 +48,7 @@ OWNER_STAMP = ".glosator"
 SECTION_ORDER = (
     "In short",
     "Explanation",
+    "Code",
     "Formulas",
     "Figures",
     "Glossary",
@@ -331,6 +332,34 @@ def figures_for(figures: Sequence[Figure], chunk: Chunk) -> list[Figure]:
     ]
 
 
+def note_prompt(
+    chunk: Chunk,
+    source_text: str,
+    book_title: str,
+    domain: str = config.DEFAULT_DOMAIN,
+    language: Language = ENGLISH,
+) -> str:
+    """The text pass's prompt for one chunk.
+
+    A programming book asks for its listings where any other book asks for
+    its formulas: its code is what a reader needs without the book open, and
+    its extraction recognises no formulas (docs/DECISIONS.md, 2026-11-02).
+    """
+    technical = "code.md" if listing.wanted(domain) else "formulas.md"
+    return render(
+        load_prompt("note.md"),
+        section=chunk.section,
+        title=chunk.title,
+        source=book_title,
+        domain=domain,
+        pages=f"{chunk.page_start}-{chunk.page_end}",
+        text=source_text,
+        language=language.name,
+        glossary=load_prompt(language.glossary_prompt).strip(),
+        technical=load_prompt(technical).strip(),
+    )
+
+
 def run(
     chunk: Chunk,
     *,
@@ -354,17 +383,7 @@ def run(
             f"{chunk.section}: {tokens} tokens of source exceed the "
             f"{config.CHUNK_MAX_TOKENS} token budget; split the page range"
         )
-    prompt = render(
-        load_prompt("note.md"),
-        section=chunk.section,
-        title=chunk.title,
-        source=book_title,
-        domain=domain,
-        pages=f"{chunk.page_start}-{chunk.page_end}",
-        text=source_text,
-        language=language.name,
-        glossary=load_prompt(language.glossary_prompt).strip(),
-    )
+    prompt = note_prompt(chunk, source_text, book_title, domain, language)
 
     raw = ollama.generate(model, prompt)
     sections = split_sections(normalise_math(strip_wrapping(raw)))

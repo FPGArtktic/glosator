@@ -17,10 +17,7 @@ Two to four sentences: what this is and why it matters.
 Plain language, 300-700 words. Analogies are allowed but must be marked as
 analogies ("as an analogy, ..."). Explain every symbol you use.
 
-## Formulas
-Every formula the section uses, each on its own line between $$ and $$,
-followed by one line saying what it is for. A formula that appears in the
-explanation belongs here too. Write "None in this section." if there are none.
+{{technical}}
 
 ## Glossary
 {{glossary}}

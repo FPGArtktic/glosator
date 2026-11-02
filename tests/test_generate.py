@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import date
 from pathlib import Path
 
@@ -54,17 +55,7 @@ def test_render_rejects_an_unknown_placeholder() -> None:
 
 
 def test_note_prompt_has_no_leftover_placeholders(chunk: Chunk) -> None:
-    prompt = generate.render(
-        generate.load_prompt("note.md"),
-        section=chunk.section,
-        title=chunk.title,
-        source="Book",
-        domain="electronics",
-        pages="71-74",
-        text="body",
-        language="Polish",
-        glossary=generate.load_prompt("glossary-pl.md"),
-    )
+    prompt = generate.note_prompt(chunk, "body", "Book", "electronics", POLISH)
     assert "{{" not in prompt
     assert "2.3.1" in prompt
     assert "Write the note in Polish" in prompt
@@ -504,3 +495,31 @@ def test_run_asks_for_the_book_language(
     assert "Write the note in Polish" in prompts[0]
     assert "wtórnik emiterowy — emitter follower" in prompts[0]
     assert "## W skrócie" in path.read_text(encoding="utf-8")
+
+
+def test_a_programming_book_is_asked_for_code_instead_of_formulas(
+    chunk: Chunk,
+) -> None:
+    prompt = generate.note_prompt(chunk, "body", "Book", "programming")
+    assert "## Code" in prompt
+    assert "character for\ncharacter" in prompt
+    assert "## Formulas" not in prompt
+
+
+def test_any_other_book_is_still_asked_for_formulas(chunk: Chunk) -> None:
+    prompt = generate.note_prompt(chunk, "body", "Book", "electronics")
+    assert "## Formulas" in prompt
+    assert "## Code" not in prompt
+
+
+def test_assemble_puts_code_right_after_the_explanation(chunk: Chunk) -> None:
+    sections = {
+        "Glossary": "- pętla — loop",
+        "Code": "```c\nint main(void)\n{\n    return 0;\n}\n```\nThe smallest program.",
+        "Explanation": "text",
+        "In short": "short",
+    }
+    note = generate.assemble(chunk, sections, "", "Book", "bk1", "m", language=POLISH)
+    headings = re.findall(r"^## (.+)$", note, re.MULTILINE)
+    assert headings == ["W skrócie", "Wyjaśnienie", "Kod", "Słowniczek"]
+    assert "{\n    return 0;\n}" in note

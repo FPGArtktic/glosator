@@ -54,6 +54,7 @@ POLISH = Language(
     headings={
         "In short": "W skrócie",
         "Explanation": "Wyjaśnienie",
+        "Code": "Kod",
         "Formulas": "Wzory",
         "Figures": "Rysunki",
         "Glossary": "Słowniczek",
