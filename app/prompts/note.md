@@ -1,10 +1,12 @@
-You write study notes from a {{domain}} textbook for one reader who is
-studying the subject. Your note must be usable without the book open.
+You write study notes from {{material}} for one reader who is studying the
+subject. Your note must be usable without the source open.
 
 Section: {{section}} {{title}}
 Source: {{source}}, pages {{pages}}
 
 {{parts}}
+
+{{slides}}
 
 Write the note in {{language}}: every word of it, including the stock
 phrases this prompt quotes, such as "None in this section." Only the section

@@ -94,6 +94,18 @@ def page_char_counts(pdf_path: Path, pages: Iterable[int]) -> dict[int, int]:
         return dict(zip(wanted, (len(text.strip()) for text in texts), strict=True))
 
 
+def is_slide_deck(pdf_path: Path) -> bool:
+    """True for a PDF of slides: most of its pages are wider than they are tall.
+
+    A book's pages are upright; a slide is a 4:3 or 16:9 landscape page, and
+    its text is a few terse lines the note has to explain, not abridge.
+    """
+    with _document(pdf_path) as pdf:
+        sizes = [pdf.get_page_size(index) for index in range(len(pdf))]
+    wide = sum(width > height for width, height in sizes)
+    return bool(sizes) and wide >= config.SLIDE_DECK_MIN_SHARE * len(sizes)
+
+
 def page_height_pt(pdf_path: Path, page: int) -> float:
     with _document(pdf_path) as pdf:
         return float(pdf[page - 1].get_height())

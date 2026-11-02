@@ -62,6 +62,16 @@ def test_note_prompt_has_no_leftover_placeholders(chunk: Chunk) -> None:
     assert "Write the note in Polish" in prompt
 
 
+def test_a_slide_deck_asks_for_the_slides_to_be_explained(chunk: Chunk) -> None:
+    prompt = generate.note_prompt(chunk, "body", "Course", "embedded", slides=True)
+    assert "{{" not in prompt
+    assert "embedded training slides" in prompt
+    assert "never list its" in prompt
+    book = generate.note_prompt(chunk, "body", "Book", "embedded")
+    assert "embedded textbook" in book
+    assert "never list its" not in book
+
+
 @pytest.mark.parametrize("name", ["note.md", "export.md"])
 def test_both_prompts_forbid_a_glossary_calque(name: str) -> None:
     # gemma4:31b's only glossary faults in tachygraf were calques: English

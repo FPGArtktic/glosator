@@ -22,3 +22,7 @@ def page_text(path: Path, first_page: int, last_page: int) -> str:
     if epub.is_epub(path):
         return epub.page_text(path, first_page, last_page)
     return pdf.page_text(path, first_page, last_page)
+
+
+def is_slide_deck(path: Path) -> bool:
+    return path.is_file() and not epub.is_epub(path) and pdf.is_slide_deck(path)

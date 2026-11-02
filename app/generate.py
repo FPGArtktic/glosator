@@ -350,16 +350,21 @@ def note_prompt(
     book_title: str,
     domain: str = config.DEFAULT_DOMAIN,
     language: Language = ENGLISH,
+    *,
+    slides: bool = False,
 ) -> str:
     """The text pass's prompt for one chunk.
 
     A programming book asks for its listings where any other book asks for
     its formulas: its code is what a reader needs without the book open, and
     its extraction recognises no formulas (docs/DECISIONS.md, 2026-11-02).
+    A slide deck's terse lines are explained rather than abridged.
     """
     technical = "code.md" if listing.wanted(domain) else "formulas.md"
     return render(
         load_prompt("note.md"),
+        material=f"{domain} training slides" if slides else f"a {domain} textbook",
+        slides=load_prompt("slides.md").strip() if slides else "",
         section=chunk.section,
         title=chunk.title,
         source=book_title,
@@ -452,6 +457,7 @@ def run(
     out_dir: Path | str | None = None,
     domain: str = config.DEFAULT_DOMAIN,
     language: Language = ENGLISH,
+    slides: bool = False,
 ) -> Path:
     """Generate one note. Raises when the input or the output is unusable."""
     source_text = chunk.text_path.read_text(encoding="utf-8")
@@ -463,7 +469,9 @@ def run(
             f"{chunk.section}: {tokens} tokens of source exceed the "
             f"{config.CHUNK_MAX_TOKENS} token budget; split the page range"
         )
-    prompt = note_prompt(chunk, source_text, book_title, domain, language)
+    prompt = note_prompt(
+        chunk, source_text, book_title, domain, language, slides=slides
+    )
 
     sections = _best_answer(chunk, prompt, source_text, model, domain)
 

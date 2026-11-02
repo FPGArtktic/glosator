@@ -16,6 +16,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
+from app import book as book_module
 from app import chunk as chunk_module
 from app import (
     config,
@@ -194,6 +195,7 @@ def _do_generate(conn: sqlite3.Connection, job: sqlite3.Row) -> None:
     figures = extract.load_figures(book["slug"])
     rows = {row["section"]: row["id"] for row in db.list_chunks(conn, job["book_id"])}
     notes_language = _language(book, chunks)
+    slides = book_module.is_slide_deck(Path(book["pdf_path"]))
 
     db.job_progress(conn, job["id"], 0, len(chunks))
     for position, item in enumerate(chunks, start=1):
@@ -227,6 +229,7 @@ def _do_generate(conn: sqlite3.Connection, job: sqlite3.Row) -> None:
                 out_dir=_out_dir(book),
                 domain=_domain(book),
                 language=notes_language,
+                slides=slides,
             )
         except Exception as error:
             db.stage_finish(

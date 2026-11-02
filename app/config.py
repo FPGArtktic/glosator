@@ -200,6 +200,9 @@ LISTING_WORD_GAP: float = 0.15
 LISTING_MONOSPACED_SHARE: float = 0.8
 LISTING_CELL_TOLERANCE: float = 0.05
 
+# A PDF is a slide deck when this share of its pages is landscape.
+SLIDE_DECK_MIN_SHARE: float = 0.8
+
 # A line among the first or last FURNITURE_EDGE_LINES of a page that is on at
 # least FURNITURE_MIN_SHARE of the pages is the document's furniture, a footer
 # or running title, and is left out of the chunks. A shorter document has no
