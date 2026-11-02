@@ -523,3 +523,11 @@ def test_assemble_puts_code_right_after_the_explanation(chunk: Chunk) -> None:
     headings = re.findall(r"^## (.+)$", note, re.MULTILINE)
     assert headings == ["W skrócie", "Wyjaśnienie", "Kod", "Słowniczek"]
     assert "{\n    return 0;\n}" in note
+
+
+def test_an_exercise_without_an_answer_is_kept_as_a_bare_task() -> None:
+    # gemma4:31b filled every unanswered exercise of a C textbook with
+    # "Answer: (no answer provided in source)" instead of leaving it out.
+    prompt = generate.load_prompt("note.md")
+    assert "with no Answer line" in prompt
+    assert "never say that the answer is missing" in prompt

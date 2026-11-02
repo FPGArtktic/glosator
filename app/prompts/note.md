@@ -27,15 +27,17 @@ Mistakes or misconceptions the source warns about. Omit this whole section if
 the source warns about nothing.
 
 ## Exercises
-Only when the source text contains exercises or review questions together
-with their answers. Each exercise is one item of a numbered list: the
-question on one line, then on the next line, indented by three spaces,
-"Answer:" and the answer the source gives. Shorten a long question or answer,
-but keep every command, option, path and value exactly as the source writes
-it. Copy each answer from the source; never complete, correct or guess one,
-even where you know a better answer. Where the source shows an answer only as
-an image, or leaves it out, leave that question (or that step of it) out.
-Omit this whole section if the source has no exercises.
+Only when the source text contains exercises or review questions. Each
+exercise is one item of a numbered list: the question on one line, then on
+the next line, indented by three spaces, "Answer:" and the answer the source
+gives. Shorten a long question or answer, but keep every command, option,
+path and value exactly as the source writes it. Copy each answer from the
+source; never complete, correct or guess one, even where you know a better
+answer. Where the source gives no answer to a question, as a programming
+book's exercises usually do, write the question alone, with no Answer line,
+and never say that the answer is missing. Where it shows an answer only as an
+image, leave that question (or that step of it) out. Omit this whole section
+if the source has no exercises.
 
 Hard rules. Each of these was broken by an earlier draft, and each broken one
 made a note that reads well and teaches something false:
