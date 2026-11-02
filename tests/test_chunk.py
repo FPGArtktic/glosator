@@ -884,3 +884,27 @@ def test_an_appendix_under_a_part_ends_the_last_chapter() -> None:
     ]
     assert chunk_module.outline_chapter(bookmarks, 252) == 21
     assert chunk_module.outline_chapter(bookmarks, 279) is None
+
+
+def test_a_merged_chunk_names_its_sections_and_keeps_them(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bookmarks = [
+        Bookmark("1.6. Arrays", 1, 3),
+        Bookmark("1.7. Functions", 1, 4),
+        Bookmark("1.8. Arguments", 1, 5),
+    ]
+    monkeypatch.setattr(pdf, "page_count", lambda _path: 5)
+    monkeypatch.setattr(pdf, "read_toc", lambda _path: bookmarks)
+    monkeypatch.setattr(
+        pdf, "page_text", lambda _p, first, _l: f"page {first} " + "x" * 400
+    )
+    chunks = chunk_module.plan("bk1", Path("/nonexistent/book.pdf"))
+    assert chunks[0].parts == ("1.6 Arrays", "1.7 Functions", "1.8 Arguments")
+    assert chunk_module.load_plan("bk1")[0].parts == chunks[0].parts
+
+
+def test_a_single_section_chunk_has_no_parts() -> None:
+    assert chunk_module.merged_parts([Span("1.6. Arrays", 1, 3, 3)]) == ()
+    split = [Span("1.6. Arrays", 1, 3, 3), Span("1.6. Arrays", 1, 4, 4)]
+    assert chunk_module.merged_parts(split) == ()

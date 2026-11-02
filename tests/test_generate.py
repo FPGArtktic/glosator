@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import re
 from datetime import date
 from pathlib import Path
@@ -558,3 +559,23 @@ def test_a_programming_book_gets_room_for_its_listings(
         "num_predict": config.LISTING_NUM_PREDICT,
     }
     assert calls[1] == {}
+
+
+def test_a_merged_chunk_asks_for_every_section(chunk: Chunk) -> None:
+    merged = dataclasses.replace(chunk, parts=("2.3.1 Emitter follower", "2.3.2 Bias"))
+    prompt = generate.note_prompt(merged, "body", "Book", "electronics")
+    assert "- 2.3.1 Emitter follower\n- 2.3.2 Bias" in prompt
+    assert "several sections" in prompt
+    assert "several sections" not in generate.note_prompt(chunk, "body", "Book")
+
+
+def test_a_merged_note_lists_its_sections_under_the_title(chunk: Chunk) -> None:
+    merged = dataclasses.replace(chunk, parts=("2.3.1 Emitter follower", "2.3.2 Bias"))
+    sections = {"In short": "a", "Explanation": "b", "Glossary": "- c — d"}
+    note = generate.assemble(
+        merged, sections, "", "Book", "bk1", "gemma4:31b", language=POLISH
+    )
+    assert (
+        "# 2.3.1 Emitter follower\n\n*Sekcje: 2.3.1 Emitter follower · 2.3.2 Bias*"
+        in note
+    )

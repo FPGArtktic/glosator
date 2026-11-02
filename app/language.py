@@ -31,6 +31,8 @@ class Language:
     pages: str
     # Contract heading to the heading written into a note; absent ones stay.
     headings: dict[str, str] = field(default_factory=dict)
+    # Labels the list of sections a note covers when it merges several.
+    sections: str = "Sections"
 
     def heading(self, name: str) -> str:
         return self.headings.get(name, name)
@@ -51,6 +53,7 @@ POLISH = Language(
     glossary_title="Słowniczek",
     reading_order="Notatki w kolejności czytania:",
     pages="strony",
+    sections="Sekcje",
     headings={
         "In short": "W skrócie",
         "Explanation": "Wyjaśnienie",

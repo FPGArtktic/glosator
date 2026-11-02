@@ -4,6 +4,8 @@ studying the subject. Your note must be usable without the book open.
 Section: {{section}} {{title}}
 Source: {{source}}, pages {{pages}}
 
+{{parts}}
+
 Write the note in {{language}}: every word of it, including the stock
 phrases this prompt quotes, such as "None in this section." Only the section
 headings stay exactly as given here, in English. Output exactly these markdown

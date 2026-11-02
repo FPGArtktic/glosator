@@ -165,6 +165,8 @@ def assemble(
         ),
         f"# {chunk.section} {chunk.title}".strip(),
     ]
+    if chunk.parts:
+        body.append(f"*{language.sections}: {' · '.join(chunk.parts)}*")
     merged = dict(sections)
     if figures_md:
         merged["Figures"] = figures_md
@@ -357,7 +359,16 @@ def note_prompt(
         language=language.name,
         glossary=load_prompt(language.glossary_prompt).strip(),
         technical=load_prompt(technical).strip(),
+        parts=_parts_instruction(chunk),
     )
+
+
+def _parts_instruction(chunk: Chunk) -> str:
+    if not chunk.parts:
+        return ""
+    return render(
+        load_prompt("parts.md"), parts="\n".join(f"- {name}" for name in chunk.parts)
+    ).strip()
 
 
 def _complete(model: str, prompt: str, domain: str) -> str:

@@ -142,6 +142,9 @@ class Chunk:
     page_start: int
     page_end: int
     text_path: Path
+    # The sections merged into this chunk, when there are several. The note
+    # is named after the first; the model must still cover them all.
+    parts: tuple[str, ...] = ()
 
 
 def section_number(title: str) -> str | None:
@@ -848,6 +851,7 @@ def plan(
                 page_start=min(span.page_start for span in group),
                 page_end=max(span.page_end for span in group),
                 text_path=text_path,
+                parts=merged_parts(group),
             )
         )
 
@@ -864,6 +868,22 @@ def plan(
             budget=sizes.max_tokens,
         )
     return chunks
+
+
+def merged_parts(group: Sequence[Span]) -> tuple[str, ...]:
+    """Names of the sections a chunk merges, or nothing for a single one.
+
+    Named after its first section only, the note of "1.6 Tablice" and "1.7
+    Funkcje" was about arrays: the model took the title for the subject and
+    left the whole of 1.7, its listing included, out.
+    """
+    names: list[str] = []
+    for span in group:
+        number = span.section
+        name = f"{number} {section_title(span.title)}" if number else span.title
+        if name not in names:
+            names.append(name)
+    return tuple(names) if len(names) > 1 else ()
 
 
 def oversized(chunks: Sequence[Chunk], *, max_tokens: int | None = None) -> list[Chunk]:
@@ -900,6 +920,7 @@ def _write_plan(book_slug: str, chunks: Sequence[Chunk], manifest: str) -> None:
             "title": chunk.title,
             "pages": [chunk.page_start, chunk.page_end],
             "text_path": str(chunk.text_path),
+            "parts": list(chunk.parts),
         }
         for chunk in chunks
     ]
@@ -936,6 +957,7 @@ def load_plan(book_slug: str, *, budget: Budget | None = None) -> list[Chunk]:
             page_start=record["pages"][0],
             page_end=record["pages"][1],
             text_path=Path(record["text_path"]),
+            parts=tuple(record.get("parts", ())),
         )
         for record in records
     ]
