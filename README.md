@@ -1,6 +1,7 @@
 # glosator
 
-glosator turns a PDF textbook into a set of sequential, linked study notes. It
+glosator turns a PDF or EPUB textbook into a set of sequential, linked study
+notes. It
 runs entirely on the local machine: no cloud API, no telemetry, and no network
 access beyond a local Ollama instance.
 
@@ -183,7 +184,8 @@ where the model would start.
 | stage | description |
 |---|---|
 | extract | docling with a tesseract backend. OCR is applied only to pages whose text layer is too thin to use. Figures are cropped from the page together with their captions. |
-| chunk | Splits the book by PDF bookmarks, or by page ranges supplied by the operator. A section is never split; a section too small to warrant a note is merged with the sections that follow it. |
+| extract (EPUB) | No model: the markup is the text. Listings keep their lines and indentation; figures are left out and their captions kept. The text is cut into pages of about 3,000 characters, each bookmark starting a page of its own, so that the stages after it read an EPUB as they read a PDF. |
+| chunk | Splits the book by its bookmarks (a PDF's outline, an EPUB's table of contents), or by page ranges supplied by the operator. A section is never split; a section too small to warrant a note is merged with the sections that follow it. |
 | generate | One model call per chunk, producing one note. |
 | vision | Optional and separate: one call per figure, with the description inserted beneath the figure in its note. |
 | index | Chapter maps, the combined glossary, and previous/next links. No model is involved. |

@@ -18,7 +18,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from app import config, extract, log, pdf
+from app import book, config, extract, log
 from app.pdf import Bookmark
 
 SECTION_RE = re.compile(r"^\s*(\d+(?:\.\d+)*)\.?\s+(.*\S)\s*$")
@@ -285,7 +285,7 @@ def readable_text(
     """
     texts: list[str] = []
     for page in range(first_page, last_page + 1):
-        layer = pdf.page_text(pdf_path, page, page)
+        layer = book.page_text(pdf_path, page, page)
         if is_contents_page(layer):
             continue
         # An empty extraction is a blank page, whose text layer is only the
@@ -723,10 +723,10 @@ def plan(
 ) -> list[Chunk]:
     """Build the chunk plan and write one text file per chunk."""
     sizes = budget or note_budget()
-    page_total = pdf.page_count(pdf_path)
+    page_total = book.page_count(pdf_path)
     by_section = False
     if page_ranges:
-        bookmarks = pdf.read_toc(pdf_path)
+        bookmarks = book.read_toc(pdf_path)
         spans = [
             Span(
                 f"pages {start}-{end}", 0, start, end, outline_chapter(bookmarks, start)
@@ -742,7 +742,7 @@ def plan(
             )
         ]
     else:
-        bookmarks = pdf.read_toc(pdf_path)
+        bookmarks = book.read_toc(pdf_path)
         for problem in outline_problems(bookmarks):
             log.event("chunk", "outline problem", book=book_slug, problem=problem)
         by_section = is_deep_outline(bookmarks)

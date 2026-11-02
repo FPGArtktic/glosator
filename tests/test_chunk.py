@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from app import chunk as chunk_module
-from app import config, extract, log
+from app import config, extract, log, pdf
 from app.chunk import Chunk, Span
 from app.pdf import Bookmark
 
@@ -17,7 +17,7 @@ from app.pdf import Bookmark
 @pytest.fixture(autouse=True)
 def no_outline(monkeypatch: pytest.MonkeyPatch) -> None:
     """Page-range plans read the outline for chapters; the test PDFs have none."""
-    monkeypatch.setattr(chunk_module.pdf, "read_toc", lambda _path: [])
+    monkeypatch.setattr(pdf, "read_toc", lambda _path: [])
 
 
 def test_section_number_and_title() -> None:
@@ -138,10 +138,10 @@ def test_plan_writes_text_files_and_json(monkeypatch: pytest.MonkeyPatch) -> Non
         Bookmark("2 Transistors", 0, 10),
         Bookmark("2.1 Basics", 1, 11),
     ]
-    monkeypatch.setattr(chunk_module.pdf, "page_count", lambda _path: 20)
-    monkeypatch.setattr(chunk_module.pdf, "read_toc", lambda _path: bookmarks)
+    monkeypatch.setattr(pdf, "page_count", lambda _path: 20)
+    monkeypatch.setattr(pdf, "read_toc", lambda _path: bookmarks)
     monkeypatch.setattr(
-        chunk_module.pdf,
+        pdf,
         "page_text",
         lambda _p, first, last: f"text {first}-{last} " + "x" * 400,
     )
@@ -158,16 +158,16 @@ def test_plan_writes_text_files_and_json(monkeypatch: pytest.MonkeyPatch) -> Non
 
 
 def test_plan_without_bookmarks_or_ranges(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(chunk_module.pdf, "page_count", lambda _path: 5)
-    monkeypatch.setattr(chunk_module.pdf, "read_toc", lambda _path: [])
+    monkeypatch.setattr(pdf, "page_count", lambda _path: 5)
+    monkeypatch.setattr(pdf, "read_toc", lambda _path: [])
     with pytest.raises(ValueError):
         chunk_module.plan("bk1", Path("/nonexistent/book.pdf"))
 
 
 def test_plan_from_page_ranges(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(chunk_module.pdf, "page_count", lambda _path: 50)
+    monkeypatch.setattr(pdf, "page_count", lambda _path: 50)
     monkeypatch.setattr(
-        chunk_module.pdf, "page_text", lambda _p, first, last: f"pages {first}-{last}"
+        pdf, "page_text", lambda _p, first, last: f"pages {first}-{last}"
     )
     chunks = chunk_module.plan(
         "bk1", Path("/nonexistent/book.pdf"), page_ranges=[(1, 2), (3, 4)]
@@ -233,9 +233,9 @@ def test_oversized_reports_chunks_above_the_budget(tmp_path: Path) -> None:
 def test_plan_warns_about_an_oversized_page_range(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(chunk_module.pdf, "page_count", lambda _path: 200)
+    monkeypatch.setattr(pdf, "page_count", lambda _path: 200)
     monkeypatch.setattr(
-        chunk_module.pdf,
+        pdf,
         "page_text",
         lambda _p, first, last: (
             "x" * (config.CHUNK_MAX_TOKENS + 1) * config.CHARS_PER_TOKEN
@@ -337,10 +337,8 @@ def test_identify_falls_back_to_the_chunk_position() -> None:
 def test_plan_names_a_page_range_chunk_from_its_running_head(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(chunk_module.pdf, "page_count", lambda _path: 200)
-    monkeypatch.setattr(
-        chunk_module.pdf, "page_text", lambda _p, _f, _l: RUNNING_HEAD_SAMPLE
-    )
+    monkeypatch.setattr(pdf, "page_count", lambda _path: 200)
+    monkeypatch.setattr(pdf, "page_text", lambda _p, _f, _l: RUNNING_HEAD_SAMPLE)
     chunks = chunk_module.plan(
         "bk1", Path("/nonexistent/book.pdf"), page_ranges=[(99, 102)]
     )
@@ -359,7 +357,7 @@ def test_running_head_survives_crlf_line_endings() -> None:
 
 
 def test_split_to_budget_leaves_a_small_range_alone(monkeypatch) -> None:
-    monkeypatch.setattr(chunk_module.pdf, "page_text", lambda _p, _f, _l: "x" * 400)
+    monkeypatch.setattr(pdf, "page_text", lambda _p, _f, _l: "x" * 400)
     assert chunk_module.split_to_budget(Path("/b.pdf"), 13, 16) == [(13, 16)]
 
 
@@ -367,7 +365,7 @@ def test_split_to_budget_cuts_a_long_range_at_page_boundaries(monkeypatch) -> No
     # Every page is a third of the budget less the joins, so three pages fit
     # and the fourth starts a new slice.
     page = "x" * (config.CHUNK_MAX_TOKENS // 3 * config.CHARS_PER_TOKEN - 8)
-    monkeypatch.setattr(chunk_module.pdf, "page_text", lambda _p, _f, _l: page)
+    monkeypatch.setattr(pdf, "page_text", lambda _p, _f, _l: page)
     assert chunk_module.split_to_budget(Path("/b.pdf"), 1, 7) == [
         (1, 3),
         (4, 6),
@@ -377,7 +375,7 @@ def test_split_to_budget_cuts_a_long_range_at_page_boundaries(monkeypatch) -> No
 
 def test_split_to_budget_keeps_an_oversized_page_whole(monkeypatch) -> None:
     page = "x" * ((config.CHUNK_MAX_TOKENS + 1) * config.CHARS_PER_TOKEN)
-    monkeypatch.setattr(chunk_module.pdf, "page_text", lambda _p, _f, _l: page)
+    monkeypatch.setattr(pdf, "page_text", lambda _p, _f, _l: page)
     assert chunk_module.split_to_budget(Path("/b.pdf"), 5, 6) == [(5, 5), (6, 6)]
 
 
@@ -405,9 +403,7 @@ def test_title_offset_finds_a_plain_line_of_the_text_layer() -> None:
 
 
 def _pages(monkeypatch: pytest.MonkeyPatch, pages: dict[int, str]) -> None:
-    monkeypatch.setattr(
-        chunk_module.pdf, "page_text", lambda _p, first, _last: pages[first]
-    )
+    monkeypatch.setattr(pdf, "page_text", lambda _p, first, _last: pages[first])
 
 
 def test_bookmark_parts_reads_past_a_heading_the_outline_lacks(
@@ -478,8 +474,8 @@ def test_plan_cuts_a_forty_page_range_into_readable_chunks(monkeypatch) -> None:
     # What pressing "Run everything" on pages 13-56 actually produced: one
     # chunk of 28607 tokens, which the generate stage refused.
     page = "x" * (650 * config.CHARS_PER_TOKEN)
-    monkeypatch.setattr(chunk_module.pdf, "page_count", lambda _path: 200)
-    monkeypatch.setattr(chunk_module.pdf, "page_text", lambda _p, _f, _l: page)
+    monkeypatch.setattr(pdf, "page_count", lambda _path: 200)
+    monkeypatch.setattr(pdf, "page_text", lambda _p, _f, _l: page)
 
     chunks = chunk_module.plan("bk1", Path("/b.pdf"), page_ranges=[(13, 56)])
 
@@ -512,10 +508,10 @@ def test_the_two_budgets_write_to_separate_files(
 ) -> None:
     """Neither pass may land on the other's plan: both are kept side by side."""
     bookmarks = [Bookmark("2 Transistors", 0, 10), Bookmark("2.1 Basics", 1, 11)]
-    monkeypatch.setattr(chunk_module.pdf, "page_count", lambda _path: 20)
-    monkeypatch.setattr(chunk_module.pdf, "read_toc", lambda _path: bookmarks)
+    monkeypatch.setattr(pdf, "page_count", lambda _path: 20)
+    monkeypatch.setattr(pdf, "read_toc", lambda _path: bookmarks)
     monkeypatch.setattr(
-        chunk_module.pdf,
+        pdf,
         "page_text",
         lambda _p, first, last: f"text {first}-{last} " + "x" * 400,
     )
@@ -536,10 +532,10 @@ def test_the_two_budgets_write_to_separate_files(
 def test_load_plan_reads_the_plan_of_the_budget_it_is_given(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(chunk_module.pdf, "page_count", lambda _path: 20)
-    monkeypatch.setattr(chunk_module.pdf, "read_toc", lambda _path: [])
+    monkeypatch.setattr(pdf, "page_count", lambda _path: 20)
+    monkeypatch.setattr(pdf, "read_toc", lambda _path: [])
     monkeypatch.setattr(
-        chunk_module.pdf,
+        pdf,
         "page_text",
         lambda _p, first, last: f"text {first}-{last} " + "x" * 400,
     )
@@ -572,7 +568,7 @@ def test_split_to_budget_honours_a_larger_ceiling(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     page = "x" * (config.CHUNK_MAX_TOKENS * config.CHARS_PER_TOKEN - 8)
-    monkeypatch.setattr(chunk_module.pdf, "page_text", lambda _p, _f, _l: page)
+    monkeypatch.setattr(pdf, "page_text", lambda _p, _f, _l: page)
     pdf_path = Path("/nonexistent/book.pdf")
 
     assert len(chunk_module.split_to_budget(pdf_path, 1, 3)) == 3
@@ -614,9 +610,7 @@ def test_one_dotted_line_on_a_page_of_text_is_not_a_contents() -> None:
 
 def test_readable_text_leaves_out_contents_pages(monkeypatch) -> None:
     pages = {1: CONTENTS_PAGE, 2: "1.1 Analog Electronics\nbody text"}
-    monkeypatch.setattr(
-        chunk_module.pdf, "page_text", lambda _p, first, _last: pages[first]
-    )
+    monkeypatch.setattr(pdf, "page_text", lambda _p, first, _last: pages[first])
     assert chunk_module.readable_text(Path("/b.pdf"), 1, 2) == pages[2]
 
 
@@ -658,9 +652,9 @@ def test_plan_names_a_headless_chunk_after_the_section_it_continues(
 ) -> None:
     pages = {1: "1.6 Power\nbody", 2: "1.7 Resistors\nbody", 3: "more body"}
     page = "x" * (config.CHUNK_MAX_TOKENS // 2 * config.CHARS_PER_TOKEN)
-    monkeypatch.setattr(chunk_module.pdf, "page_count", lambda _path: 3)
+    monkeypatch.setattr(pdf, "page_count", lambda _path: 3)
     monkeypatch.setattr(
-        chunk_module.pdf,
+        pdf,
         "page_text",
         lambda _p, first, _last: pages[first] + "\n" + page,
     )
@@ -677,9 +671,7 @@ def test_plan_names_a_headless_chunk_after_the_section_it_continues(
 
 def test_readable_text_prefers_the_page_docling_extracted(monkeypatch) -> None:
     layer = {1: "In this case,\n", 2: "text layer two"}
-    monkeypatch.setattr(
-        chunk_module.pdf, "page_text", lambda _p, first, _last: layer[first]
-    )
+    monkeypatch.setattr(pdf, "page_text", lambda _p, first, _last: layer[first])
     path = extract.page_markdown_path("bk1", 1)
     path.parent.mkdir(parents=True)
     path.write_text("In this case,\n\n$$V_{BE} < 0.6$$\n", encoding="utf-8")
@@ -691,9 +683,7 @@ def test_readable_text_prefers_the_page_docling_extracted(monkeypatch) -> None:
 def test_readable_text_drops_a_contents_page_docling_made_a_table(
     monkeypatch,
 ) -> None:
-    monkeypatch.setattr(
-        chunk_module.pdf, "page_text", lambda _p, _first, _last: CONTENTS_PAGE
-    )
+    monkeypatch.setattr(pdf, "page_text", lambda _p, _first, _last: CONTENTS_PAGE)
     path = extract.page_markdown_path("bk1", 1)
     path.parent.mkdir(parents=True)
     path.write_text("| 1.1 | Section | 3 |\n", encoding="utf-8")
@@ -710,7 +700,7 @@ def test_running_head_reads_a_markdown_heading() -> None:
 def test_split_to_budget_counts_the_separators_between_pages(monkeypatch) -> None:
     # Three pages that fit only if the joins are left out of the count.
     page = "x" * (config.CHUNK_MAX_TOKENS * config.CHARS_PER_TOKEN // 3)
-    monkeypatch.setattr(chunk_module.pdf, "page_text", lambda _p, _f, _l: page)
+    monkeypatch.setattr(pdf, "page_text", lambda _p, _f, _l: page)
     slices = chunk_module.split_to_budget(Path("/b.pdf"), 1, 3)
     for first, last in slices:
         joined = chunk_module.readable_text(Path("/b.pdf"), first, last)
@@ -728,9 +718,7 @@ def test_split_to_budget_ends_a_slice_where_a_section_starts(monkeypatch) -> Non
         4: "1.5 Units\n" + body,
         5: body,
     }
-    monkeypatch.setattr(
-        chunk_module.pdf, "page_text", lambda _p, first, _last: pages[first]
-    )
+    monkeypatch.setattr(pdf, "page_text", lambda _p, first, _last: pages[first])
     slices = chunk_module.split_to_budget(
         Path("/b.pdf"), 1, 5, min_tokens=config.CHUNK_MAX_TOKENS // 2
     )
@@ -781,7 +769,7 @@ def test_balanced_split_keeps_the_count_and_evens_the_slices(monkeypatch) -> Non
     # Eleven pages a tenth of the budget each: greedy cuts 10 + 1 pages,
     # balanced cuts the same two slices of five and six.
     page = "x" * (config.CHUNK_MAX_TOKENS * config.CHARS_PER_TOKEN // 10 - 8)
-    monkeypatch.setattr(chunk_module.pdf, "page_text", lambda _p, _f, _l: page)
+    monkeypatch.setattr(pdf, "page_text", lambda _p, _f, _l: page)
     slices = chunk_module.balanced_split(
         Path("/b.pdf"), 1, 11, chunk_module.note_budget(), "bk1"
     )
@@ -794,11 +782,11 @@ def test_plan_of_a_deep_outline_names_every_part_after_its_section(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     page = "x" * (config.CHUNK_MAX_TOKENS * config.CHARS_PER_TOKEN // 8)
-    monkeypatch.setattr(chunk_module.pdf, "page_count", lambda _path: 44)
-    monkeypatch.setattr(chunk_module.pdf, "read_toc", lambda _path: LPI_OUTLINE)
+    monkeypatch.setattr(pdf, "page_count", lambda _path: 44)
+    monkeypatch.setattr(pdf, "read_toc", lambda _path: LPI_OUTLINE)
     # Pages 1-11 are the title page and the topic page: a line each.
     monkeypatch.setattr(
-        chunk_module.pdf,
+        pdf,
         "page_text",
         lambda _p, first, _last: "Topic 101" if first <= 11 else page,
     )
@@ -848,9 +836,7 @@ def test_an_appendix_after_the_last_chapter_is_not_part_of_it() -> None:
 def test_readable_text_keeps_a_blank_extracted_page_blank(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        chunk_module.pdf, "page_text", lambda _p, first, _l: f"Footer {first} 0f1e"
-    )
+    monkeypatch.setattr(pdf, "page_text", lambda _p, first, _l: f"Footer {first} 0f1e")
     path = extract.page_markdown_path("bk1", 2)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n", encoding="utf-8")

@@ -27,10 +27,12 @@ def test_the_blocks_tree_builds() -> None:
     assert len(blocks.blocks) > 0
 
 
-def test_pdf_choices_lists_only_pdfs(tmp_path: Path) -> None:
+def test_pdf_choices_lists_only_books(tmp_path: Path) -> None:
     (tmp_path / "book.pdf").write_bytes(b"%PDF-1.7\n")
     (tmp_path / "notes.txt").write_text("not a book")
     assert ui.pdf_choices(tmp_path) == ["book.pdf"]
+    (tmp_path / "other.EPUB").write_bytes(b"PK")
+    assert ui.pdf_choices(tmp_path) == ["book.pdf", "other.EPUB"]
 
 
 def test_pdf_choices_of_a_missing_folder(tmp_path: Path) -> None:

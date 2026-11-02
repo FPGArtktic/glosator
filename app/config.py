@@ -101,6 +101,10 @@ POLISH_LETTER_MIN_SHARE: float = 0.02
 # How much of the chunks' text the language is judged from.
 LANGUAGE_SAMPLE_CHARS: int = 200_000
 
+# An EPUB has no pages; extraction cuts one about this long, at the end of a
+# paragraph, so that chunking can read it like a PDF. A printed page of the
+# Helion books measured holds 2,500 to 3,000 characters.
+EPUB_PAGE_CHARS: int = 3000
 OCR_LANGS: str = os.environ.get("GLOSATOR_OCR_LANGS", "pol+eng")
 
 # Where docling runs: "auto" puts it on the card when nvml reports at least

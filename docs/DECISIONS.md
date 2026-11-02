@@ -707,3 +707,32 @@ section over the budget is cut by pages and marked "(continued)".
 Programming books now give about twice as many chunks: 200 for the
 1,000-page Prata, 60 for K&R. Those chunks are text that used to be lost,
 not new cost.
+
+## 2026-11-02 — An EPUB is read from its markup, cut into pages
+
+An EPUB is XHTML: headings, paragraphs, tables and listings are in the
+markup, so extraction needs no model and no OCR, and a listing arrives as
+typed, without rebuilding it from glyph positions. What it lacks is pages,
+which chunking, the database and the UI are all built on.
+
+So `app/epub.py` cuts the text into pages. Every target of the table of
+contents starts a page, so each bookmark starts at the top of one and the
+title-trimming of bookmark chunks has nothing to trim; the rest is cut at
+the end of a paragraph once a page passes 3,000 characters, about a printed
+page of the Helion books measured. Chunking reads pages, bookmarks and the
+page count through `app/book.py`, which sends a PDF to `pdf` and an EPUB to
+`epub`. Converting EPUBs to PDF with Calibre would have needed no code, and
+would have thrown away the markup only to rebuild it from a text layer.
+
+Three things the measured books needed:
+
+- a listing is one `<pre>` or `<p class="listing...">` per line, and the
+  lines of one listing are joined into one fenced block;
+- XHTML uses HTML's named entities, which an XML parser drops: "a&nbsp;b"
+  read as "ab". They are turned into numeric ones before parsing;
+- the publisher's page naming the buyer is not in the table of contents
+  and is short; such a page with a mail address in it is left out, so the
+  watermark never reaches a note.
+
+Figures are left out for now, captions kept: the vision pass crops figures
+from rendered PDF pages, and an EPUB's images would need their own path.

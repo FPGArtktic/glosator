@@ -20,6 +20,7 @@ from app import chunk as chunk_module
 from app import (
     config,
     db,
+    epub,
     export,
     extract,
     generate,
@@ -28,6 +29,7 @@ from app import (
     listing,
     log,
     ollama,
+    pdf,
     vision,
 )
 from app.chunk import Chunk
@@ -145,18 +147,24 @@ def _do_extract(conn: sqlite3.Connection, job: sqlite3.Row) -> None:
     book = _book(conn, job)
     params = _params(job)
     db.stage_start(conn, job["book_id"], None, "extract", job["model"])
-    result = extract.run(
-        book["slug"],
-        Path(book["pdf_path"]),
-        params["first_page"],
-        params["last_page"],
-        params.get("ocr_langs", config.OCR_LANGS),
-        force=bool(params.get("force")),
-        listings=listing.wanted(_domain(book)),
-    )
+    path = Path(book["pdf_path"])
+    if epub.is_epub(path):
+        # The markup is the text: no model, no page range, nothing to resume.
+        epub.extract(book["slug"], path)
+        book_dir = config.WORK_DIR / book["slug"]
+    else:
+        book_dir = extract.run(
+            book["slug"],
+            path,
+            params.get("first_page") or 1,
+            params.get("last_page") or pdf.page_count(path),
+            params.get("ocr_langs", config.OCR_LANGS),
+            force=bool(params.get("force")),
+            listings=listing.wanted(_domain(book)),
+        ).book_dir
     db.job_progress(conn, job["id"], 1, 1)
     db.stage_finish(
-        conn, job["book_id"], None, "extract", job["model"], db.DONE, result.book_dir
+        conn, job["book_id"], None, "extract", job["model"], db.DONE, book_dir
     )
 
 

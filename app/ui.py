@@ -21,12 +21,13 @@ from pathlib import Path
 
 import gradio as gr
 
+from app import book, config, db, export, extract, generate, log, ollama
 from app import chunk as chunk_module
-from app import config, db, export, extract, generate, log, ollama, pdf
 
 WORKER_RESTART_S = 5.0
 JOB_COLUMNS = ["id", "stage", "status", "progress", "eta", "model", "error"]
 # The two text models the operator chooses between without typing a tag.
+BOOK_SUFFIXES = (".pdf", ".epub")
 SPEED_CHOICES = {"quality": config.TEXT_MODEL, "fast": config.FAST_TEXT_MODEL}
 
 
@@ -34,7 +35,11 @@ def pdf_choices(books_dir: str | Path) -> list[str]:
     directory = Path(books_dir).expanduser()
     if not directory.is_dir():
         return []
-    return sorted(path.name for path in directory.glob("*.pdf"))
+    return sorted(
+        path.name
+        for path in directory.iterdir()
+        if path.suffix.lower() in BOOK_SUFFIXES and path.is_file()
+    )
 
 
 def resolve_pdf(
@@ -63,7 +68,7 @@ def toc_labels(pdf_path: Path) -> list[str]:
     """Indented bookmark titles. The indent shows the tree; the value is the title."""
     return [
         f"{'    ' * mark.level}{mark.title}  (p. {mark.page})"
-        for mark in pdf.read_toc(pdf_path)
+        for mark in book.read_toc(pdf_path)
     ]
 
 
@@ -210,7 +215,9 @@ def build() -> gr.Blocks:
                     pdf_choices(config.IN_DIR), label="Book", interactive=True
                 )
                 refresh_pdfs = gr.Button("Refresh book list", size="sm")
-                upload = gr.File(label="or upload a PDF", file_types=[".pdf"])
+                upload = gr.File(
+                    label="or upload a PDF or EPUB", file_types=list(BOOK_SUFFIXES)
+                )
                 title = gr.Textbox(
                     label="Book title", placeholder="the title on the cover"
                 )
@@ -330,7 +337,7 @@ def build() -> gr.Blocks:
             if not titles:
                 raise gr.Error("select sections or give page ranges")
             spans = chunk_module.spans_from_bookmarks(
-                pdf.read_toc(path), pdf.page_count(path), titles
+                book.read_toc(path), book.page_count(path), titles
             )
             return (
                 path,
@@ -354,7 +361,7 @@ def build() -> gr.Blocks:
 
         def on_load_toc(books, choice, uploaded):
             path = resolve_pdf(books, choice, uploaded)
-            bookmarks = pdf.read_toc(path)
+            bookmarks = book.read_toc(path)
             problems = chunk_module.outline_problems(bookmarks)
             message = f"{len(bookmarks)} bookmarks loaded."
             if problems:

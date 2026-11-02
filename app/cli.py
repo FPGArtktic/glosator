@@ -43,7 +43,7 @@ def _parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     add = sub.add_parser("add", help="register a PDF and where its notes go")
-    add.add_argument("pdf", type=Path)
+    add.add_argument("pdf", type=Path, help="the book: a PDF or an EPUB")
     add.add_argument("--title", required=True)
     add.add_argument("--slug", help="defaults to a slug of the title")
     add.add_argument(
@@ -73,7 +73,9 @@ def _parser() -> argparse.ArgumentParser:
         stage_parser.add_argument("--model", default=None)
         stage_parser.add_argument("--force", action="store_true")
         if stage == "extract":
-            stage_parser.add_argument("--pages", required=True, help="e.g. 60-120")
+            stage_parser.add_argument(
+                "--pages", default=None, help="e.g. 60-120 (default: the whole book)"
+            )
             stage_parser.add_argument("--ocr", default=config.OCR_LANGS)
         if stage in ("chunk", "export"):
             stage_parser.add_argument("--pages", default=None)
@@ -109,12 +111,10 @@ def _queue_stage(conn, args) -> int:
 
     params = {"force": args.force}
     if args.command == "extract":
-        ranges = chunk_module.parse_page_ranges(args.pages)
-        params |= {
-            "first_page": ranges[0][0],
-            "last_page": ranges[-1][1],
-            "ocr_langs": args.ocr,
-        }
+        params["ocr_langs"] = args.ocr
+        if args.pages:
+            ranges = chunk_module.parse_page_ranges(args.pages)
+            params |= {"first_page": ranges[0][0], "last_page": ranges[-1][1]}
     if args.command in ("chunk", "export") and args.pages:
         params["page_ranges"] = chunk_module.parse_page_ranges(args.pages)
 
