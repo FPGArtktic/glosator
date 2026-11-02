@@ -168,6 +168,12 @@ LISTING_LINE_TOLERANCE: float = 0.5
 # two of the pilot books 0.9-2.1 pt against a 3.75-4.26 pt cell, while the
 # gaps between letters stayed under 0.1 pt.
 LISTING_WORD_GAP: float = 0.15
+# A line is in the listing's monospaced font when this share of its glyphs is
+# one cell wide, within this share of a cell. Only such lines set the left
+# edge: docling's box sometimes takes in a line of prose, which starts at the
+# text margin, left of an indented listing, and shifted every line of it.
+LISTING_MONOSPACED_SHARE: float = 0.8
+LISTING_CELL_TOLERANCE: float = 0.05
 
 # A bought ebook can carry a per-copy watermark: one hex digest in the footer
 # of every page, which docling merges into the text. A digest is taken for a

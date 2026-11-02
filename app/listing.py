@@ -49,7 +49,8 @@ def layout(glyphs: Sequence[Glyph]) -> str:
         return ""
     cell = statistics.median(glyph.right - glyph.left for glyph in glyphs)
     lines = _lines(glyphs)
-    margin = min(line[0].left for line in lines)
+    code = [line for line in lines if _monospaced(line, cell)] or lines
+    margin = min(line[0].left for line in code)
     text = "\n".join(_line_text(line, margin, cell) for line in lines)
     return text.translate(TYPESET_TO_ASCII)
 
@@ -66,6 +67,13 @@ def _lines(glyphs: Sequence[Glyph]) -> list[list[Glyph]]:
         else:
             lines.append([glyph])
     return [sorted(line, key=lambda glyph: glyph.left) for line in lines]
+
+
+def _monospaced(line: Sequence[Glyph], cell: float) -> bool:
+    """True when the line is set in the listing's own, monospaced font."""
+    tolerance = config.LISTING_CELL_TOLERANCE * cell
+    even = sum(abs(glyph.right - glyph.left - cell) <= tolerance for glyph in line)
+    return even >= config.LISTING_MONOSPACED_SHARE * len(line)
 
 
 def _line_text(line: Sequence[Glyph], margin: float, cell: float) -> str:

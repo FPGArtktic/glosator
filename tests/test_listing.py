@@ -148,3 +148,15 @@ def test_a_word_break_the_text_layer_has_survives_a_closed_gap() -> None:
         Glyph("c", after.right, after.bottom, after.right + CELL, after.top, True)
     )
     assert listing.layout(glyphs) == "ab c"
+
+
+def test_a_line_of_prose_in_the_box_does_not_shift_the_listing() -> None:
+    glyphs = monospaced(PROGRAM, left=MARGIN + 6 * CELL)
+    left = MARGIN
+    prose_top = TOP + LEADING
+    for width, character in zip((3.0, 5.0, 2.5, 4.0), "Text", strict=True):
+        glyphs.append(
+            Glyph(character, left, prose_top - HEIGHT, left + width, prose_top)
+        )
+        left += width
+    assert listing.layout(glyphs) == "Text\n" + PROGRAM
