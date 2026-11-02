@@ -1,6 +1,6 @@
 [project]
 name = "glosator"
-version = "0.4.1"
+version = "0.5.0"
 description = "PDF textbook to sequential study notes in an Obsidian vault, fully local"
 requires-python = ">=3.12"
 license = "GPL-3.0-or-later"
