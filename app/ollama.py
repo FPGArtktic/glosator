@@ -19,6 +19,10 @@ class OllamaUnavailable(RuntimeError):
     """Ollama could not be reached or the model is not pulled."""
 
 
+class AnswerTooLong(OllamaUnavailable):
+    """The answer ran into num_predict or the end of the context window."""
+
+
 def client() -> ollama.Client:
     return ollama.Client(host=config.OLLAMA_URL, timeout=config.OLLAMA_TIMEOUT_S)
 
@@ -88,5 +92,5 @@ def generate(
         # Cut off at num_predict or at the end of the context window. The
         # note would be missing its last sections, or the end of one, with
         # nothing to show it: the chunk fails and is retried instead.
-        raise OllamaUnavailable(f"{model} stopped at its length limit")
+        raise AnswerTooLong(f"{model} stopped at its length limit")
     return text

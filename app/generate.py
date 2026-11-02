@@ -436,15 +436,24 @@ def _answer(chunk: Chunk, model: str, prompt: str, domain: str) -> dict[str, str
 
 
 def _complete(model: str, prompt: str, domain: str) -> str:
-    """The model's answer, with room for verbatim listings where they belong."""
+    """The model's answer, with room for verbatim listings where they belong.
+
+    A chunk of any book can need that room too: an exercises section of
+    Silberschatz copies every task into the note and ran past NUM_PREDICT,
+    seven chunks of 128. Such an answer is asked for once more with the
+    room a programming book gets, rather than failing the chunk.
+    """
+    wide = {
+        "num_ctx": config.LISTING_NUM_CTX,
+        "num_predict": config.LISTING_NUM_PREDICT,
+    }
     if listing.wanted(domain):
-        return ollama.generate(
-            model,
-            prompt,
-            num_ctx=config.LISTING_NUM_CTX,
-            num_predict=config.LISTING_NUM_PREDICT,
-        )
-    return ollama.generate(model, prompt)
+        return ollama.generate(model, prompt, **wide)
+    try:
+        return ollama.generate(model, prompt)
+    except ollama.AnswerTooLong:
+        log.event("generate", "answer too long, asking with a wider window")
+        return ollama.generate(model, prompt, **wide)
 
 
 def run(

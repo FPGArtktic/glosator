@@ -108,7 +108,7 @@ def test_generate_rejects_a_response_cut_off_at_the_limit(
     fake = FakeClient(response="## In short\nhalf a note")
     fake.done_reason = "length"
     monkeypatch.setattr(ollama, "client", lambda: fake)
-    with pytest.raises(ollama.OllamaUnavailable, match="length limit"):
+    with pytest.raises(ollama.AnswerTooLong, match="length limit"):
         ollama.generate("gemma4:31b", "prompt")
 
 

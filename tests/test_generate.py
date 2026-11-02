@@ -582,6 +582,33 @@ def test_a_programming_book_gets_room_for_its_listings(
     assert calls[1] == {}
 
 
+def test_an_answer_cut_off_is_asked_for_with_more_room(
+    chunk: Chunk, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[dict] = []
+
+    def fake_generate(_model, _prompt, **options):
+        calls.append(options)
+        if not options:
+            raise generate.ollama.AnswerTooLong("stopped at its length limit")
+        return MODEL_OUTPUT
+
+    monkeypatch.setattr(generate.ollama, "generate", fake_generate)
+    generate.run(
+        chunk,
+        book_slug="bk1",
+        book_title="Book",
+        book_tag="bk1",
+        chapter_title="Transistors",
+        figures=[],
+        domain="electronics",
+    )
+    assert calls == [
+        {},
+        {"num_ctx": config.LISTING_NUM_CTX, "num_predict": config.LISTING_NUM_PREDICT},
+    ]
+
+
 def test_a_merged_chunk_asks_for_every_section(chunk: Chunk) -> None:
     merged = dataclasses.replace(chunk, parts=("2.3.1 Emitter follower", "2.3.2 Bias"))
     prompt = generate.note_prompt(merged, "body", "Book", "electronics")
