@@ -1,0 +1,36 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Mateusz <109816464+FPGArtktic@users.noreply.github.com>
+#
+# Build the text model that fits a 16 GB card: gemma-4-31B-it at Q3_K_M,
+# without the vision projector, every layer on the GPU.
+#
+# Ollama's gemma4:31b is Q4_K_M, 20 GB with its projector, and runs 20 of
+# its 61 layers on the CPU of a 16 GB card. The note pass never shows the
+# model a picture, and the vision pass uses its own model, so the projector
+# only takes room. Measured on K&R: about three times faster, with the same
+# listings, tables and language (docs/DECISIONS.md, 2026-11-02).
+#
+# Then: GLOSATOR_TEXT_MODEL=gemma4-31b-q3-text in the Quadlet unit.
+
+set -eu
+
+SOURCE="${SOURCE:-hf.co/unsloth/gemma-4-31B-it-GGUF:Q3_K_M}"
+NAME="${NAME:-gemma4-31b-q3-text}"
+# With every layer on the card the CPU threads only wait for it; four keep
+# a note's time and leave the desktop its cores.
+THREADS="${THREADS:-4}"
+
+ollama pull "$SOURCE"
+
+modelfile=$(mktemp)
+trap 'rm -f "$modelfile"' EXIT
+# The first FROM is the model, a second one the vision projector.
+ollama show --modelfile "$SOURCE" | awk '
+	/^FROM / { if (seen++) next }
+	{ print }
+' >"$modelfile"
+printf 'PARAMETER num_gpu 99\nPARAMETER num_thread %s\n' "$THREADS" >>"$modelfile"
+
+ollama create "$NAME" -f "$modelfile"
+echo "created $NAME; set GLOSATOR_TEXT_MODEL=$NAME"
