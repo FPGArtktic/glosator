@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 
 from app import chunk as chunk_module
-from app import config, db, extract, worker
+from app import config, db, extract, listing, verify, worker
 from app.language import LANGUAGES
 
 STAGES = ("extract", "chunk", "generate", "vision", "index", "export")
@@ -35,6 +35,8 @@ def main(argv: list[str] | None = None) -> int:
         book_id = _add(conn, args)
         print(f"book {book_id}")
         return 0
+    if args.command == "verify":
+        return _verify(conn, args)
     return _queue_stage(conn, args)
 
 
@@ -80,6 +82,12 @@ def _parser() -> argparse.ArgumentParser:
         if stage in ("chunk", "export"):
             stage_parser.add_argument("--pages", default=None)
 
+    check = sub.add_parser(
+        "verify", help="check a book's notes against their source; runs at once"
+    )
+    check.add_argument("--book", required=True, help="book slug")
+    check.add_argument("--chapter", type=int, default=None)
+
     sub.add_parser("queue", help="list jobs")
     sub.add_parser("worker", help="run the queue consumer in the foreground")
     return parser
@@ -97,6 +105,23 @@ def _add(conn, args) -> int:
     return db.upsert_book(
         conn, slug, args.title, args.pdf.resolve(), out_dir, args.domain, args.lang
     )
+
+
+def _verify(conn, args) -> int:
+    """Print the checks of verify.run; exit 1 when a note has a problem."""
+    row = conn.execute("SELECT * FROM books WHERE slug = ?", (args.book,)).fetchone()
+    if row is None:
+        raise SystemExit(f"unknown book {args.book!r}; run 'glosator add' first")
+    domain = row["domain"] or config.DEFAULT_DOMAIN
+    reports = verify.run(
+        args.book,
+        row["out_dir"] or config.OUT_DIR,
+        listings=listing.wanted(domain),
+        chapter=args.chapter,
+    )
+    for line in verify.summary(reports):
+        print(line)
+    return 1 if any(report.problems for report in reports) else 0
 
 
 def _queue_stage(conn, args) -> int:

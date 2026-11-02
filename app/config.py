@@ -101,6 +101,11 @@ POLISH_LETTER_MIN_SHARE: float = 0.02
 # How much of the chunks' text the language is judged from.
 LANGUAGE_SAMPLE_CHARS: int = 200_000
 
+# glosator verify flags a note holding fewer listing lines of its source
+# than this share, or fewer words than this share of the source's. A note of
+# a 3,000-token chunk runs to about a third of its words.
+VERIFY_MIN_CODE_SHARE: float = 0.9
+VERIFY_MIN_WORD_SHARE: float = 0.1
 # An EPUB has no pages; extraction cuts one about this long, at the end of a
 # paragraph, so that chunking can read it like a PDF. A printed page of the
 # Helion books measured holds 2,500 to 3,000 characters.

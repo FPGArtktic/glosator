@@ -197,6 +197,23 @@ next run resumes rather than starting again, a chunk that failed is retried,
 and a chunk that succeeded is not rewritten. Re-running the figure pass
 retries precisely the figures that failed.
 
+## Checking a book's notes
+
+`glosator verify --book SLUG [--chapter N]` checks the notes written so far
+against the text each was written from, at once and without a model, and
+prints one line per chapter:
+
+```
+chapter 5: 6/6 notes, listings 412/415 lines (409 exact), 0 flagged
+```
+
+A note is flagged when a programming book's listings did not reach it (under
+90% of the source's listing lines, compared with spacing squeezed; "exact"
+counts the lines with their indentation as printed), when a watermark digest
+or a mail address the source does not have got in, or when it has fewer
+words than a tenth of its source. The exit status is 1 when any note is
+flagged, so a run can be checked chapter by chapter while it goes on.
+
 ## Without a local model
 
 The **Run without a local LLM** button, and the `export` stage behind it, run
