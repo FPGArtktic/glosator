@@ -26,6 +26,7 @@ FENCE_RE = re.compile(r"^```[^\n]*\n(.*?)^```", re.MULTILINE | re.DOTALL)
 DIGEST_RE = re.compile(r"\b(?=[0-9a-f]*[a-f])(?=[0-9a-f]*\d)[0-9a-f]{32}\b")
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 WORD_RE = re.compile(r"\w+")
+INLINE_CODE_RE = re.compile(r"`([^`\n]+)`")
 TABLE_RULE_RE = re.compile(r"^\|[\s:|-]+\|$")
 
 
@@ -70,10 +71,18 @@ def _check_listings(report: Report, note: str, source: str) -> None:
     Found compares lines with their spacing squeezed; exact compares them as
     printed, indentation included. A listing the model rewrote loses lines
     from both, one it re-indented only from the second.
+
+    The prompt sends an expression quoted in a sentence to the explanation,
+    between backticks, and a table set as aligned text to a markdown table;
+    a line found there counts as found, though never as exact.
     """
     wanted = [line.rstrip() for line in _code_lines(source) if line.strip()]
     have = [line.rstrip() for line in _code_lines(note)]
     squeezed = {_squeeze(line) for line in have}
+    squeezed |= {_squeeze(span) for span in INLINE_CODE_RE.findall(note)}
+    squeezed |= {
+        _squeeze(_cells(row)) for row in note.splitlines() if row.startswith("|")
+    }
     exact = set(have)
     report.code_lines = len(wanted)
     report.code_found = sum(_found(_squeeze(line), squeezed) for line in wanted)
@@ -82,6 +91,11 @@ def _check_listings(report: Report, note: str, source: str) -> None:
         report.problems.append(
             f"listings: {report.code_found} of {len(wanted)} source lines in the note"
         )
+
+
+def _cells(row: str) -> str:
+    """A table row's text without its rules and backticks."""
+    return row.replace("|", " ").replace("`", "")
 
 
 def _found(line: str, have: set[str]) -> bool:

@@ -114,3 +114,13 @@ def test_a_table_copied_whole_passes_and_a_summarised_one_is_a_problem() -> None
         report(), note("") + "\nThe table lists two rows.", TABLE, listings=False
     )
     assert told.problems == ["tables: 0 of 3 source rows in the note"]
+
+
+def test_expressions_quoted_in_text_and_tables_count_as_found() -> None:
+    source = "```\nisdigit(c)\n```\n\n```\n\\a bell    \\\\ backslash\n```\n"
+    text = (
+        note("") + "\nUse `isdigit(c)` here.\n\n| `\\a` | bell | `\\\\` | backslash |\n"
+    )
+    checked = verify.check(report(), text, source, listings=True)
+    assert (checked.code_found, checked.code_exact, checked.code_lines) == (2, 0, 2)
+    assert checked.problems == []
