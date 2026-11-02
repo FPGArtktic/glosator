@@ -766,3 +766,20 @@ kept. Three times the speed is worth that: the queue of nine books drops
 from about 60 hours to about 20. The code default stays `gemma4:31b`,
 which needs no extra step; this machine sets
 `GLOSATOR_TEXT_MODEL=gemma4-31b-q3-text` in its unit.
+
+## 2026-11-02 — Speculative decoding waits; a failing answer is asked for again
+
+The official `gemma4:31b` carries a multi-token-prediction draft. Attached
+to Q3_K_M it did not fit the card; attached to Q3_K_S (13.2 GB) it fit,
+wrote 90 tokens a second against 44, and accepted 72-76% of the drafted
+tokens: a note in 22-38 s. But Q3_K_S itself is a step down: on the chunk
+of K&R 1.6 and 1.7 it kept 66 of 87 listing lines, Q3_K_M 76 and Q4_K_M
+79. Speculative decoding changes no output; the smaller quantisation does.
+The text model stays Q3_K_M without a draft.
+
+Two runs of Q3_K_M on K&R 1.2 kept 51 and 79 of its 84 listing lines: the
+loss was chance, not the quantisation, and Q4_K_M has lost lines the same
+way. So `generate` checks each answer as `glosator verify` would and asks
+once more when it fails, keeping the better of the two. The chat template
+was ruled out on the way: Q3_K_M with Ollama's gemma4 renderer and with the
+GGUF's own template kept the same lines.
