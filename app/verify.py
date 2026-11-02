@@ -130,7 +130,8 @@ def _table_rows(text: str) -> list[str]:
         line = line.strip()
         if not line.startswith("|") or TABLE_RULE_RE.match(line):
             continue
-        cells = [_squeeze(cell) for cell in line.strip("|").split("|")]
+        # The model sets code in a cell between backticks; the book does not.
+        cells = [_squeeze(cell.replace("`", "")) for cell in line.strip("|").split("|")]
         if any(cells):
             rows.append("|".join(cells))
     return rows

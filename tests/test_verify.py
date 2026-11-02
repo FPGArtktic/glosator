@@ -124,3 +124,10 @@ def test_expressions_quoted_in_text_and_tables_count_as_found() -> None:
     checked = verify.check(report(), text, source, listings=True)
     assert (checked.code_found, checked.code_exact, checked.code_lines) == (2, 0, 2)
     assert checked.problems == []
+
+
+def test_a_table_row_matches_with_its_code_in_backticks() -> None:
+    source = "| char *strcpy(s,ct) | copies ct to s |\n|---|---|\n"
+    text = note("") + "\n| `char *strcpy(s,ct)` | copies `ct` to `s` |\n|---|---|\n"
+    checked = verify.check(report(), text, source, listings=False)
+    assert (checked.table_found, checked.table_rows) == (1, 1)
