@@ -801,3 +801,31 @@ book's form (`# 1.10 ...`), a chapter bookmark becomes section `1` titled
 may be followed by its dot without a space. Notes written before keep their
 names; a book regenerated after this gets the new ones, and its index links
 them.
+
+## 2026-11-02 — Slide decks: numbered outline, no furniture, a prompt of their own
+
+Bootlin's training slides, and a course's own lab book, have a three-level
+outline (module, section, slide) with no number anywhere. The planner found
+no chapter in it: chunks ran across modules, notes took the title of
+whichever slide began them, and "About Bootlin" opened the first. Every
+slide also carries the company's footer and "20/334", some thirty lines in
+a note's worth of text.
+
+Such an outline is now numbered before it is planned: every top-level
+bookmark that is not apparatus is chapter N, its children sections N.k.
+That makes it a deep outline, planned like the LPI materials. Bookmarks
+before the first module are the title slide and are dropped; apparatus
+beside a section (the closing slides) is kept out of it. Lines on the edges
+of 60% or more of the pages are furniture and are left out of the chunks.
+
+A slide is a title and a few terse lines: abridging it, as the prompt asks
+of a book, leaves nothing. A PDF that is mostly landscape gets a paragraph
+that asks for the lines to be explained, the commands to go to the code
+section whole, and a diagram's label soup not to be listed. The hard rules
+stay: the note says nothing the slides do not.
+
+What the slides leave unsaid is not the local model's to add. For the
+Bootlin notes, a later pass by Claude Haiku appends a section of its own,
+marked as coming from outside the slides, after the note is written; the
+note above it stays what the slides say.
+

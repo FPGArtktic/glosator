@@ -189,7 +189,7 @@ where the model would start.
 |---|---|
 | extract | docling with a tesseract backend. OCR is applied only to pages whose text layer is too thin to use. Figures are cropped from the page together with their captions. |
 | extract (EPUB) | No model: the markup is the text. Listings keep their lines and indentation; figures are left out and their captions kept. The text is cut into pages of about 3,000 characters, each bookmark starting a page of its own, so that the stages after it read an EPUB as they read a PDF. |
-| chunk | Splits the book by its bookmarks (a PDF's outline, an EPUB's table of contents), or by page ranges supplied by the operator. A section is never split; a section too small to warrant a note is merged with the sections that follow it. |
+| chunk | Splits the book by its bookmarks (a PDF's outline, an EPUB's table of contents), or by page ranges supplied by the operator. A section is never split; a section too small to warrant a note is merged with the sections that follow it. A line the document prints at the edge of most pages, a footer or a running title, is left out. |
 | generate | One model call per chunk, producing one note. |
 | vision | Optional and separate: one call per figure, with the description inserted beneath the figure in its note. |
 | index | Chapter maps, the combined glossary, and previous/next links. No model is involved. |
@@ -289,6 +289,16 @@ of `Formulas`:
 ```
 --domain programming   ->   ## Explanation … ## Code (```c … ```) … ## Glossary
 ```
+
+Training slides are read as slides. A PDF whose pages are mostly landscape
+is taken for a slide deck: its notes explain each slide's few terse lines in
+prose instead of abridging them, and pass over the jumble of labels a
+diagram's text leaves. An outline with no numbers at all, as a course's
+slides and its lab book have, is numbered on the way in: each module is a
+chapter, its sections are `N.k`, and its slides are read inside their
+section. The trainer's company slides, the course's practicalities, the
+title slide and the closing slides are left out, and so is the footer every
+slide repeats.
 
 ## Measured performance
 
