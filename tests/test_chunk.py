@@ -844,3 +844,14 @@ def test_an_appendix_after_the_last_chapter_is_not_part_of_it() -> None:
     assert chunk_module.outline_chapter(bookmarks, 210) == 8
     assert chunk_module.outline_chapter(bookmarks, 235) is None
 
+
+def test_readable_text_keeps_a_blank_extracted_page_blank(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        chunk_module.pdf, "page_text", lambda _p, first, _l: f"Footer {first} 0f1e"
+    )
+    path = extract.page_markdown_path("bk1", 2)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n", encoding="utf-8")
+    assert chunk_module.readable_text(Path("/b.pdf"), 1, 2, "bk1") == "Footer 1 0f1e"

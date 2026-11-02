@@ -288,7 +288,12 @@ def readable_text(
         layer = pdf.page_text(pdf_path, page, page)
         if is_contents_page(layer):
             continue
-        texts.append(_extracted_page(book_slug, page) or layer)
+        # An empty extraction is a blank page, whose text layer is only the
+        # footer: the book's title, the page number and the watermark digest.
+        extracted = _extracted_page(book_slug, page)
+        text = layer if extracted is None else extracted
+        if text:
+            texts.append(text)
     return PAGE_SEPARATOR.join(texts)
 
 
