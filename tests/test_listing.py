@@ -82,6 +82,7 @@ def test_no_glyphs_give_no_text() -> None:
 
 def test_listings_are_wanted_for_programming_books_only() -> None:
     assert listing.wanted("Programming")
+    assert listing.wanted("embedded Linux")
     assert not listing.wanted("electronics")
 
 

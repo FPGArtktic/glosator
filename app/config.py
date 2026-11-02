@@ -180,8 +180,9 @@ REPEATED_FIGURE_SIZE_TOLERANCE_PT: float = 2.0
 PREVIEW_PAGES: int = 3
 
 # Books whose code listings are rebuilt from the text layer and copied into
-# the notes. The domain is the one given to "glosator add --domain".
-LISTING_DOMAINS: frozenset[str] = frozenset({"programming"})
+# the notes. The domain is the one given to "glosator add --domain". Embedded
+# Linux is taught in commands, recipes, device trees and kernel modules.
+LISTING_DOMAINS: frozenset[str] = frozenset({"programming", "embedded linux"})
 # How far outside docling's box around a listing a character may sit and
 # still belong to it, in points: the box is drawn around ink, not glyph cells.
 LISTING_BOX_MARGIN_PT: float = 2.0
