@@ -200,6 +200,15 @@ LISTING_WORD_GAP: float = 0.15
 LISTING_MONOSPACED_SHARE: float = 0.8
 LISTING_CELL_TOLERANCE: float = 0.05
 
+# A line among the first or last FURNITURE_EDGE_LINES of a page that is on at
+# least FURNITURE_MIN_SHARE of the pages is the document's furniture, a footer
+# or running title, and is left out of the chunks. A shorter document has no
+# furniture to speak of; a line of fewer letters is a page number.
+FURNITURE_EDGE_LINES: int = 3
+FURNITURE_MIN_SHARE: float = 0.6
+FURNITURE_MIN_PAGES: int = 10
+FURNITURE_MIN_LETTERS: int = 3
+
 # A bought ebook can carry a per-copy watermark: one hex digest in the footer
 # of every page, which docling merges into the text. A digest is taken for a
 # watermark only when it repeats on this many pages of a batch, so a hash a

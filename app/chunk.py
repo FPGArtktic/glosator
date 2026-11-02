@@ -16,6 +16,7 @@ import re
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
+from functools import lru_cache
 from pathlib import Path
 
 from app import book, config, epub, extract, log
@@ -66,6 +67,9 @@ APPARATUS_TITLES = frozenset(
         "copyingthisdocument",
     }
 )
+# A line of the page's furniture, compared with every digit the same: the
+# footer "Bootlin - https://bootlin.com 20/334" is one line on every page.
+DIGITS_RE = re.compile(r"\d+")
 # A heading this short ("## 4") begins too many titles to stand for one.
 TITLE_PREFIX_MIN_CHARS = 6
 CONTINUED = " (continued)"
@@ -397,10 +401,65 @@ def readable_text(
         # An empty extraction is a blank page, whose text layer is only the
         # footer: the book's title, the page number and the watermark digest.
         extracted = _extracted_page(book_slug, page)
-        text = layer if extracted is None else extracted
+        text = without_furniture(layer if extracted is None else extracted, pdf_path)
         if text:
             texts.append(text)
     return PAGE_SEPARATOR.join(texts)
+
+
+def without_furniture(text: str, pdf_path: Path) -> str:
+    """The page without the lines the document prints on most of its pages."""
+    lines = furniture(pdf_path)
+    if not lines:
+        return text
+    kept = [line for line in text.split("\n") if _furniture_key(line) not in lines]
+    return "\n".join(kept).strip()
+
+
+def furniture(pdf_path: Path) -> frozenset[str]:
+    """Keys of the lines at the edge of most pages: a footer, a running title.
+
+    Slides print the company, its address and "20/334" at the foot of every
+    slide; a publisher's PDF prints the buyer's watermark on every page. Each
+    costs a chunk a line per page, and the model copies it into the note.
+    Only the first and last lines of a page are counted, so a line of the
+    text that happens to repeat ("return 0;") is never taken for furniture.
+    """
+    if epub.is_epub(pdf_path) or not pdf_path.is_file():
+        return frozenset()
+    stat = pdf_path.stat()
+    return _furniture(pdf_path, stat.st_mtime_ns, stat.st_size)
+
+
+@lru_cache(maxsize=8)
+def _furniture(pdf_path: Path, _mtime: int, _size: int) -> frozenset[str]:
+    pages = book.page_count(pdf_path)
+    if pages < config.FURNITURE_MIN_PAGES:
+        return frozenset()
+    seen: Counter[str] = Counter()
+    edge = config.FURNITURE_EDGE_LINES
+    for page in range(1, pages + 1):
+        lines = [
+            line
+            for line in book.page_text(pdf_path, page, page).split("\n")
+            if line.strip()
+        ]
+        seen.update({_furniture_key(line) for line in lines[:edge] + lines[-edge:]})
+    return frozenset(
+        key
+        for key, count in seen.items()
+        if count >= config.FURNITURE_MIN_SHARE * pages
+        and len(DIGITS_RE.sub("", key)) >= config.FURNITURE_MIN_LETTERS
+    )
+
+
+def _furniture_key(line: str) -> str:
+    """The line as furniture is compared: letters and numbers, digits alike.
+
+    docling and the text layer set the same footer differently ("- Kernel,
+    drivers ..." as a list item, the page number on a line of its own).
+    """
+    return DIGITS_RE.sub("0", _letters(line))
 
 
 def _extracted_page(book_slug: str | None, page: int) -> str | None:

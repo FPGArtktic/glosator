@@ -988,3 +988,41 @@ def test_apparatus_beside_a_section_is_not_part_of_it() -> None:
     ranges = chunk_module.section_ranges(numbered, 11)
     assert ("2 Exit codes", 9, 9) in ranges
     assert ("Last slides", 10, 11) in ranges
+
+
+def test_a_line_at_the_edge_of_most_pages_is_furniture(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    book_path = tmp_path / "course.pdf"
+    book_path.write_bytes(b"%PDF")
+    footer = "Shell course - https://example.org"
+
+    def page(_path: Path, number: int, _last: int) -> str:
+        # "fi" closes a script on every page, but in the middle of it.
+        topic = "abcdefghijklm"[number]
+        return "\n".join(
+            [
+                *(f"{line} {topic}" for line in ("Topic", "Case", "Usage")),
+                "fi",
+                *(f"{line} {topic}" for line in ("Note", "Run")),
+                footer,
+                f"{number}/12",
+            ]
+        )
+
+    monkeypatch.setattr(pdf, "page_count", lambda _path: 12)
+    monkeypatch.setattr(pdf, "page_text", page)
+    text = chunk_module.without_furniture(page(book_path, 3, 3), book_path)
+    assert footer not in text
+    assert "fi" in text.split("\n")
+    assert text.startswith("Topic d")
+
+
+def test_a_short_document_has_no_furniture(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    book_path = tmp_path / "leaflet.pdf"
+    book_path.write_bytes(b"%PDF")
+    monkeypatch.setattr(pdf, "page_count", lambda _path: 3)
+    monkeypatch.setattr(pdf, "page_text", lambda _p, _f, _l: "Same line\nbody")
+    assert chunk_module.furniture(book_path) == frozenset()
