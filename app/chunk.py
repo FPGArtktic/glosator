@@ -262,18 +262,22 @@ def outline_chapter(bookmarks: Sequence[Bookmark], page: int) -> int | None:
     A book whose outline names only its chapters ("Chapter 2 - Basic Analog
     Circuit Analysis") cannot drive chunking, but it still says which chapter
     a page is in, and a note without a chapter lands outside every chapter
-    folder. A top-level bookmark that is not a chapter ends the chapter
-    before it: an appendix or the index after the last chapter is not part
-    of it.
+    folder. A bookmark that is not a chapter, at the chapter's level or
+    above it, ends the chapter before it: an appendix or the index after the
+    last chapter is not part of it, also where parts put the chapters and
+    the appendices one level down.
     """
     chapter = None
+    chapter_level = 0
     for mark in sorted(bookmarks, key=lambda mark: mark.page):
         if mark.page > page:
             break
         number = extract.chapter_number(mark.title)
         if number is not None:
             chapter = number
-        elif mark.level == 0:
+            if extract.is_chapter_heading(mark.title):
+                chapter_level = mark.level
+        elif mark.level <= chapter_level:
             chapter = None
     return chapter
 

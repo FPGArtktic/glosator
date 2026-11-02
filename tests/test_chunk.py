@@ -873,3 +873,14 @@ def test_a_trusted_outline_names_its_chunk_despite_a_numbered_line() -> None:
         "Glossary",
     )
 
+
+def test_an_appendix_under_a_part_ends_the_last_chapter() -> None:
+    bookmarks = [
+        Bookmark("Part Five. Parallel organization", 0, 250),
+        Bookmark("Chapter 21. Multicore computers", 1, 251),
+        Bookmark("21.1. Performance", 2, 252),
+        Bookmark("Appendix A. System buses", 1, 278),
+        Bookmark("A.1. Bus structure", 2, 279),
+    ]
+    assert chunk_module.outline_chapter(bookmarks, 252) == 21
+    assert chunk_module.outline_chapter(bookmarks, 279) is None
