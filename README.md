@@ -331,9 +331,32 @@ points at which measurement contradicted the original plan.
 Retrieval-augmented generation, vector databases, embeddings, cloud APIs and
 Windows support. This is a batch job, not a retrieval system.
 
+## Copyright: for your own study only
+
+Most textbooks are under copyright, and a note can carry the book's own words:
+a quoted definition, an exercise and, for a programming book, its code
+listings, copied verbatim on purpose. glosator is meant for one use only:
+study notes, for yourself, from a book you own a lawful copy of.
+
+- Run it only on books you have lawfully bought or otherwise lawfully have.
+- Keep what it produces for your own private use. Do not publish, upload or
+  pass on the notes, the extracted text in `work/` or the `_source` export of
+  a book under copyright.
+- The author of glosator accepts no responsibility for how anyone uses it,
+  and none for notes or extracts that someone else shares. Whoever shares
+  them answers for it.
+
+This repository holds no text from any book. The tests use code and text
+written for them.
+
+**Po polsku:** robienie notatek z książek chronionych prawem autorskim jest
+dozwolone wyłącznie na własny, prywatny użytek, i tylko z książki, którą
+posiadasz legalnie. Nie udostępniaj notatek ani wyciągniętego tekstu. Autor
+glosatora nie odpowiada za to, że ktoś takie notatki udostępni.
+
 ## License
 
 GPL-3.0-or-later; see [LICENSE](LICENSE).
 
 The notes produced by the program are not covered by that license. They belong
-to whoever ran it.
+to whoever ran it, within the limits set out under "Copyright" above.
