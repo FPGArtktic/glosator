@@ -43,7 +43,7 @@ TABLE_RULE_RE = re.compile(r"-{4,}")
 PAGES_DIR = "pages"
 BATCHES_DIR = "batches"
 # Bumped when what a batch writes changes, so older batches are not reused.
-BATCH_FORMAT = 1
+BATCH_FORMAT = 2
 # From <linux/prctl.h>: deliver a signal to this process when its parent dies.
 PR_SET_PDEATHSIG = 1
 
@@ -560,8 +560,20 @@ def _convert_on_best_device(
 
 def _write_pages(book_slug: str, document, first_page: int, last_page: int) -> None:
     for page in range(first_page, last_page + 1):
-        markdown = compact_tables(document.export_to_markdown(page_no=page))
+        markdown = compact_tables(page_markdown(document, page))
         _write_text(page_markdown_path(book_slug, page), markdown.strip() + "\n")
+
+
+def page_markdown(document, page: int | None = None) -> str:
+    """docling's markdown of one page, or of all, with the text as printed.
+
+    Its defaults escape HTML and underscores for a markdown renderer. The
+    reader here is a model, which copies what it is shown: a programming book
+    came out with "&amp;&amp;" for "&&" and "unique\\_ptr" for "unique_ptr".
+    """
+    return document.export_to_markdown(
+        page_no=page, escape_html=False, escape_underscores=False
+    )
 
 
 def compact_tables(markdown: str) -> str:
@@ -606,7 +618,7 @@ def preview(
     last_page = min(first_page + pages - 1, pdf.page_count(pdf_path))
     needs_ocr = bool(pages_needing_ocr(pdf_path, first_page, last_page))
     document = _convert(pdf_path, first_page, last_page, ocr_langs, needs_ocr, "cpu")
-    return document.export_to_markdown()
+    return page_markdown(document)
 
 
 class ExtractionIncomplete(RuntimeError):

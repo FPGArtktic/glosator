@@ -239,7 +239,7 @@ def test_a_failed_cpu_conversion_is_not_hidden(monkeypatch) -> None:
 
 def test_the_preview_never_touches_the_card(monkeypatch) -> None:
     class Document:
-        def export_to_markdown(self) -> str:
+        def export_to_markdown(self, **_options) -> str:
             return "text"
 
     devices: list[str] = []
@@ -427,3 +427,15 @@ def test_alike_boxes_of_different_sizes_are_kept() -> None:
 
 def _sighting(image: int, page: int, height: float = 70.0) -> extract.Sighting:
     return extract.Sighting(image, page, 197.0, height)
+
+
+def test_page_markdown_keeps_code_characters_as_printed() -> None:
+    from docling_core.types.doc.document import DoclingDocument
+    from docling_core.types.doc.labels import DocItemLabel
+
+    document = DoclingDocument(name="sample")
+    document.add_text(
+        label=DocItemLabel.TEXT, text="while (left_index < n && *cursor != 0)"
+    )
+    markdown = extract.page_markdown(document)
+    assert "left_index < n && *cursor" in markdown
