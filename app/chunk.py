@@ -842,14 +842,20 @@ def plan(
     chunks: list[Chunk] = []
     used: set[str] = set()
     carried: tuple[str, str] | None = None
+    previous_head: Span | None = None
     for order, group in enumerate(groups, start=1):
         head = group[0]
         text = "\n\n".join(text_by_span[span] for span in group).strip()
         chapter, number, title = identify(
             head, text, order, carried, trusted=epub.is_epub(pdf_path)
         )
-        if number in used and not title.endswith(CONTINUED):
+        # A part of a section cut to the budget has a number of its own when
+        # the section has none ("011 Podejście 2. Szczegóły" after "010 ..."),
+        # so the repeated number cannot tell it is a continuation.
+        continues = number in used or _same_bookmark(head, previous_head)
+        if continues and not title.endswith(CONTINUED):
             title = f"{title}{CONTINUED}"
+        previous_head = group[-1]
         carried = next(reversed(headings(text, head.chapter)), carried)
         section = _unique(number, used)
         text_path = chunk_dir / f"{order:03d}-{extract.slugify(section)}.md"
@@ -880,6 +886,15 @@ def plan(
             budget=sizes.max_tokens,
         )
     return chunks
+
+
+def _same_bookmark(span: Span, previous: Span | None) -> bool:
+    """True for the next part of a bookmark that bookmark_parts cut in two."""
+    return (
+        previous is not None
+        and (span.title, span.level) == (previous.title, previous.level)
+        and span.page_start > previous.page_start
+    )
 
 
 def merged_parts(group: Sequence[Span]) -> tuple[str, ...]:

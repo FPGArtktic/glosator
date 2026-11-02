@@ -923,3 +923,18 @@ def test_a_chapter_bookmark_is_numbered_as_its_chapter() -> None:
     span = Span("Rozdział 5. Wskaźniki i tablice", 0, 113, 117)
     assert chunk_module.identify(span, "text", 23) == (5, "5", "Wskaźniki i tablice")
     assert chunk_module.chapter_name("Chapter 2 - Transistors") == "Transistors"
+
+
+def test_the_second_part_of_an_unnumbered_section_is_a_continuation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sizes = chunk_module.note_budget()
+    filler = "x" * (sizes.max_tokens // 3 * config.CHARS_PER_TOKEN)
+    bookmarks = [Bookmark("Details", 1, 1), Bookmark("Summary", 1, 7)]
+    monkeypatch.setattr(pdf, "page_count", lambda _path: 7)
+    monkeypatch.setattr(pdf, "read_toc", lambda _path: bookmarks)
+    monkeypatch.setattr(pdf, "page_text", lambda _p, first, _l: f"p{first} {filler}")
+    titles = [c.title for c in chunk_module.plan("bk1", Path("/nonexistent/b.pdf"))]
+    assert titles[0] == "Details"
+    assert titles[1] == f"Details{chunk_module.CONTINUED}"
+    assert titles[-1] == "Summary"
