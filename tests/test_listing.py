@@ -135,3 +135,7 @@ def test_a_word_space_a_fifth_of_a_cell_wide_is_kept() -> None:
             left += 3.0
         left += 1.2
     assert listing.layout(glyphs) == "total; do it"
+
+
+def test_a_typeset_minus_and_asterisk_become_ascii() -> None:
+    assert listing.layout(monospaced("p\u2212>next = \u2217q;")) == "p->next = *q;"

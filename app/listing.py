@@ -18,6 +18,11 @@ from itertools import pairwise
 from app import config
 from app.pdf import Glyph
 
+# Characters a typesetter puts in code for the look of it, each of which can
+# only stand for the ASCII one in a program: a book set "p->x" with a minus
+# sign, and a compiler, or a reader copying the note, would refuse it.
+TYPESET_TO_ASCII = str.maketrans({"\u2212": "-", "\u2217": "*"})
+
 
 def wanted(domain: str) -> bool:
     """True for a book whose listings belong in its notes."""
@@ -45,7 +50,8 @@ def layout(glyphs: Sequence[Glyph]) -> str:
     cell = statistics.median(glyph.right - glyph.left for glyph in glyphs)
     lines = _lines(glyphs)
     margin = min(line[0].left for line in lines)
-    return "\n".join(_line_text(line, margin, cell) for line in lines)
+    text = "\n".join(_line_text(line, margin, cell) for line in lines)
+    return text.translate(TYPESET_TO_ASCII)
 
 
 def _lines(glyphs: Sequence[Glyph]) -> list[list[Glyph]]:
