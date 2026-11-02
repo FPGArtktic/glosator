@@ -687,3 +687,23 @@ chunk of ten C++ pages (about 5,600 tokens, half of it code) ran past
 
 The wider window costs some KV cache; gemma4's sliding-window layers keep
 that small, and the pilot run checks it on the card.
+
+## 2026-11-02 — A bookmark's text comes from its pages
+
+A book with a flat outline (sections as bookmarks, nothing under them) used
+to get each section's text by slicing the chapter file at headings. docling
+writes every heading at one level, so the first heading the outline does
+not list ended the section: "4.11.1" ended "4.11", and an appendix whose
+subsections all have their own headings lost nine tenths of its text. The
+plans of the three C books held 68%, 78% and 46% of the pages' text.
+
+The text is now read by pages, as for a deep outline. Headings are used
+only on the two pages a section shares with its neighbours: its own title
+on the page it starts on, the next bookmark's title on the page that one
+starts on. The comparison ignores everything but letters and digits; where
+the next title is not found, its page stays with the next section. A
+section over the budget is cut by pages and marked "(continued)".
+
+Programming books now give about twice as many chunks: 200 for the
+1,000-page Prata, 60 for K&R. Those chunks are text that used to be lost,
+not new cost.
