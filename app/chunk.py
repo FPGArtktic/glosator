@@ -36,6 +36,10 @@ RUNNING_HEAD_RE = re.compile(
 CONTENTS_LEADER_RE = re.compile(r"(?:\.\s?){4,}")
 CONTENTS_ENTRY_RE = re.compile(r"^[^\n]*?(?:\.\s?){4,}\s*\d{1,4}[ \t]*$", re.MULTILINE)
 PAGE_SEPARATOR = "\n\n"
+LINE_RE = re.compile(r"^.*$", re.MULTILINE)
+NON_LETTERS_RE = re.compile(r"[\W_]+")
+# A heading this short ("## 4") begins too many titles to stand for one.
+TITLE_PREFIX_MIN_CHARS = 6
 CONTINUED = " (continued)"
 # balanced_split raises its trial ceiling by a twentieth at a time.
 BALANCE_STEP_DIVISOR = 20
@@ -409,6 +413,15 @@ def section_spans(
 def balanced_split(
     pdf_path: Path, first_page: int, last_page: int, sizes: Budget, book_slug: str
 ) -> list[tuple[int, int]]:
+    """balanced_slices over a page range of the PDF."""
+    pages = {
+        page: readable_text(pdf_path, page, page, book_slug)
+        for page in range(first_page, last_page + 1)
+    }
+    return balanced_slices(pages, sizes)
+
+
+def balanced_slices(pages: dict[int, str], sizes: Budget) -> list[tuple[int, int]]:
     """The fewest slices the budget allows, made as even as the pages permit.
 
     Cut greedily, a section of 6300 tokens is one note of 6000 and one of 300
@@ -418,19 +431,16 @@ def balanced_split(
     """
 
     def cut(ceiling: int) -> list[tuple[int, int]]:
-        return split_to_budget(
-            pdf_path,
-            first_page,
-            last_page,
-            max_tokens=ceiling,
-            min_tokens=min(sizes.min_tokens, ceiling),
-            book_slug=book_slug,
+        return slice_pages(
+            pages, max_tokens=ceiling, min_tokens=min(sizes.min_tokens, ceiling)
         )
 
     greedy = cut(sizes.max_tokens)
     if len(greedy) < 2:
         return greedy
-    total = estimate_tokens(readable_text(pdf_path, first_page, last_page, book_slug))
+    total = estimate_tokens(
+        PAGE_SEPARATOR.join(text for text in pages.values() if text)
+    )
     ceiling = total // len(greedy)
     while ceiling < sizes.max_tokens:
         even = cut(ceiling)
@@ -485,28 +495,39 @@ def split_to_budget(
     700 words, then covers a dozen pages of several subjects and leaves most
     of them out.
     """
+    pages = {
+        page: readable_text(pdf_path, page, page, book_slug)
+        for page in range(first_page, last_page + 1)
+    }
+    return slice_pages(pages, max_tokens=max_tokens, min_tokens=min_tokens)
+
+
+def slice_pages(
+    pages: dict[int, str],
+    *,
+    max_tokens: int | None = None,
+    min_tokens: int | None = None,
+) -> list[tuple[int, int]]:
+    """split_to_budget over page texts already read, in page order."""
     ceiling = max_tokens if max_tokens is not None else config.CHUNK_MAX_TOKENS
     # Measured in characters, as estimate_tokens measures the joined chunk,
     # and with the separator each page adds to the join. Rounding every page
     # down to whole tokens let a chunk of fifteen pages end 8 tokens over.
     ceiling_chars = ceiling * config.CHARS_PER_TOKEN
     floor_chars = (min_tokens or ceiling) * config.CHARS_PER_TOKEN
-    sizes: dict[int, int] = {}
-    opens_section: dict[int, bool] = {}
-    for page in range(first_page, last_page + 1):
-        text = readable_text(pdf_path, page, page, book_slug)
-        sizes[page] = len(text) + len(PAGE_SEPARATOR) if text else 0
-        opens_section[page] = bool(headings(text))
+    numbers = list(pages)
     slices: list[tuple[int, int]] = []
-    start, total = first_page, 0
-    for page in range(first_page, last_page + 1):
-        full = total + sizes[page] > ceiling_chars
-        at_section = total >= floor_chars and opens_section[page]
+    start, total = numbers[0], 0
+    for page in numbers:
+        text = pages[page]
+        size = len(text) + len(PAGE_SEPARATOR) if text else 0
+        full = total + size > ceiling_chars
+        at_section = total >= floor_chars and bool(headings(text))
         if total and (full or at_section):
             slices.append((start, page - 1))
             start, total = page, 0
-        total += sizes[page]
-    slices.append((start, last_page))
+        total += size
+    slices.append((start, numbers[-1]))
     return slices
 
 
@@ -572,15 +593,119 @@ def group_spans(
     return groups
 
 
-def span_text(book_slug: str, pdf_path: Path, span: Span) -> str:
-    """Source text of a span: the extracted markdown if found, else raw PDF text."""
-    for chapter_file in sorted((config.WORK_DIR / book_slug).glob("*.md")):
-        sliced = extract.slice_section(
-            chapter_file.read_text(encoding="utf-8"), span.title
-        )
-        if sliced:
-            return sliced
-    return readable_text(pdf_path, span.page_start, span.page_end, book_slug)
+def bookmark_parts(
+    pdf_path: Path,
+    bookmarks: Sequence[Bookmark],
+    spans: Sequence[Span],
+    sizes: Budget,
+    book_slug: str,
+) -> list[tuple[Span, str]]:
+    """The text of each bookmark's span, cut by pages to the budget.
+
+    A span's text runs from its own title on the page it starts on to the
+    title of the next bookmark on the page that one starts on. Both titles
+    are looked for on those two pages only, so a heading the outline does
+    not list ("4.11.1 Wstawianie plików" under "4.11 Preprocesor") cannot end
+    a section early. Slicing the chapter files at headings did exactly that:
+    docling gives every heading the same level, and 54% of a 1000-page book
+    never reached a note.
+
+    A span over the budget is cut by pages like a deep outline's section, and
+    the plan marks its later parts "(continued)".
+    """
+    parts: list[tuple[Span, str]] = []
+    for span in spans:
+        pages = _bookmark_pages(pdf_path, span, _following(bookmarks, span), book_slug)
+        if not any(pages.values()):
+            parts.append((span, ""))
+            continue
+        for first, last in balanced_slices(pages, sizes):
+            text = PAGE_SEPARATOR.join(
+                text for page, text in pages.items() if first <= page <= last and text
+            )
+            part = Span(span.title, span.level, first, last, span.outline_chapter)
+            parts.append((part, text))
+    return parts
+
+
+def _following(bookmarks: Sequence[Bookmark], span: Span) -> Bookmark | None:
+    """The bookmark that ends ``span``, as spans_from_bookmarks chose it."""
+    for index, mark in enumerate(bookmarks):
+        if (mark.title, mark.page) == (span.title, span.page_start):
+            return next(
+                (other for other in bookmarks[index + 1 :] if other.page >= mark.page),
+                None,
+            )
+    return None
+
+
+def _bookmark_pages(
+    pdf_path: Path, span: Span, following: Bookmark | None, book_slug: str
+) -> dict[int, str]:
+    """The pages of a span, trimmed to its title and the next bookmark's.
+
+    The page the next bookmark starts on is read too, for the end of this
+    section above its title. Where that title is not found, the page is left
+    to the next section, as the span's page range says.
+    """
+    last_page = span.page_end
+    if following is not None and following.page > last_page:
+        last_page = following.page
+    pages = {
+        page: readable_text(pdf_path, page, page, book_slug)
+        for page in range(span.page_start, last_page + 1)
+    }
+    start = title_offset(pages[span.page_start], span.title)
+    if start is not None:
+        pages[span.page_start] = pages[span.page_start][start:]
+    if following is None:
+        return pages
+    # On a shared page the search starts below the span's own title.
+    after = 1 if last_page == span.page_start and start is not None else 0
+    end = title_offset(pages[last_page], following.title, after)
+    if end is not None:
+        pages[last_page] = pages[last_page][:end].rstrip()
+    elif last_page > span.page_end:
+        del pages[last_page]
+    return pages
+
+
+def title_offset(text: str, title: str, start: int = 0) -> int | None:
+    """Where the line that opens the section ``title`` begins, if on this page.
+
+    The outline and docling rarely agree to the character: "1.8.Argumenty —"
+    in the outline is "## 1.8. Argumenty -" on the page, so only letters and
+    digits are compared. A heading that matches whole wins, then a plain line
+    that does (a page read from the text layer has no headings), then a
+    heading that begins the title: docling may cut "Rozdział 5. OPERATORY"
+    into "## Rozdział 5." and "## OPERATORY".
+    """
+    wanted = _letters(title)
+    if not wanted:
+        return None
+    plain = prefix = None
+    for match in LINE_RE.finditer(text, start):
+        line = match.group(0).lstrip()
+        is_heading = line.startswith("#")
+        found = _letters(line.lstrip("#"))
+        if not found:
+            continue
+        if found == wanted and is_heading:
+            return match.start()
+        if found == wanted and plain is None:
+            plain = match.start()
+        if (
+            is_heading
+            and prefix is None
+            and len(found) >= TITLE_PREFIX_MIN_CHARS
+            and wanted.startswith(found)
+        ):
+            prefix = match.start()
+    return plain if plain is not None else prefix
+
+
+def _letters(text: str) -> str:
+    return NON_LETTERS_RE.sub("", text).casefold()
 
 
 def plan(
@@ -624,13 +749,15 @@ def plan(
     if not spans:
         raise ValueError("no bookmarks selected and no page ranges given")
 
-    by_pages = bool(page_ranges) or by_section
-    texts = [
-        readable_text(pdf_path, span.page_start, span.page_end, book_slug)
-        if by_pages
-        else span_text(book_slug, pdf_path, span)
-        for span in spans
-    ]
+    if page_ranges or by_section:
+        texts = [
+            readable_text(pdf_path, span.page_start, span.page_end, book_slug)
+            for span in spans
+        ]
+    else:
+        parts = bookmark_parts(pdf_path, bookmarks, spans, sizes, book_slug)
+        spans = [span for span, _text in parts]
+        texts = [text for _span, text in parts]
     # Page ranges are boundaries the operator drew: they are never merged
     # across, and split_to_budget has already cut them to a readable size.
     if page_ranges:
@@ -640,7 +767,7 @@ def plan(
             spans, [estimate_tokens(text) for text in texts], budget=sizes
         )
     text_by_span = dict(zip(spans, texts, strict=True))
-    if by_section:
+    if not page_ranges:
         groups = _drop_empty(groups, text_by_span, book_slug)
 
     chunk_dir = config.WORK_DIR / book_slug / sizes.subdir

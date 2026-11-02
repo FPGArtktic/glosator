@@ -141,7 +141,9 @@ def test_plan_writes_text_files_and_json(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setattr(chunk_module.pdf, "page_count", lambda _path: 20)
     monkeypatch.setattr(chunk_module.pdf, "read_toc", lambda _path: bookmarks)
     monkeypatch.setattr(
-        chunk_module.pdf, "page_text", lambda _p, first, last: f"text {first}-{last}"
+        chunk_module.pdf,
+        "page_text",
+        lambda _p, first, last: f"text {first}-{last} " + "x" * 400,
     )
 
     chunks = chunk_module.plan("bk1", pdf_path)
@@ -379,6 +381,99 @@ def test_split_to_budget_keeps_an_oversized_page_whole(monkeypatch) -> None:
     assert chunk_module.split_to_budget(Path("/b.pdf"), 5, 6) == [(5, 5), (6, 6)]
 
 
+def test_title_offset_ignores_punctuation_and_spacing() -> None:
+    page = "end of 1.7\n\n## 1.8. Values - passed by copy\n\nbody\n"
+    offset = chunk_module.title_offset(page, "1.8.Values \u2014 passed by copy")
+    assert offset is not None
+    assert page[offset:].startswith("## 1.8.")
+
+
+def test_title_offset_accepts_a_chapter_title_cut_in_two() -> None:
+    page = "## Chapter 5.\n\n## LOOPS AND BRANCHES\n\ntext\n"
+    assert chunk_module.title_offset(page, "Chapter 5. Loops and branches") == 0
+
+
+def test_title_offset_prefers_a_whole_heading_to_a_prefix() -> None:
+    page = "## Pointers\n\nintro\n\n## Pointers and arrays\n\nbody\n"
+    offset = chunk_module.title_offset(page, "Pointers and arrays")
+    assert page[offset:].startswith("## Pointers and arrays")
+
+
+def test_title_offset_finds_a_plain_line_of_the_text_layer() -> None:
+    page = "the end of the last section.\n3.2 Branches\nnew text\n"
+    assert chunk_module.title_offset(page, "3.2. Branches") == page.index("3.2")
+
+
+def _pages(monkeypatch: pytest.MonkeyPatch, pages: dict[int, str]) -> None:
+    monkeypatch.setattr(
+        chunk_module.pdf, "page_text", lambda _p, first, _last: pages[first]
+    )
+
+
+def test_bookmark_parts_reads_past_a_heading_the_outline_lacks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Every heading on the page has the same level, as docling writes them;
+    # "4.11.1" is not a bookmark and must not end "4.11".
+    _pages(
+        monkeypatch,
+        {
+            7: "tail of 4.10\n\n## 4.11 Macros\n\nopening\n\n"
+            "## 4.11.1 Include\n\nmiddle",
+            8: "more of 4.11\n\n## 5 Pointers\n\nnext chapter",
+        },
+    )
+    bookmarks = [
+        Bookmark("4.10 Recursion", 1, 6),
+        Bookmark("4.11 Macros", 1, 7),
+        Bookmark("5 Pointers", 0, 8),
+    ]
+    spans = chunk_module.spans_from_bookmarks(bookmarks, page_count=8)
+    sizes = chunk_module.note_budget()
+    parts = chunk_module.bookmark_parts(
+        Path("/b.pdf"), bookmarks, spans[1:2], sizes, "bk1"
+    )
+    [(span, text)] = parts
+    assert text.startswith("## 4.11 Macros")
+    assert "middle" in text
+    assert "more of 4.11" in text
+    assert "tail of 4.10" not in text
+    assert "next chapter" not in text
+    assert (span.page_start, span.page_end) == (7, 8)
+
+
+def test_bookmark_parts_leaves_a_page_without_the_next_title_to_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _pages(monkeypatch, {3: "## 1 Start\n\nbody", 4: "heading lost by docling"})
+    bookmarks = [Bookmark("1 Start", 0, 3), Bookmark("2 Next", 0, 4)]
+    spans = chunk_module.spans_from_bookmarks(bookmarks, page_count=4)
+    sizes = chunk_module.note_budget()
+    [(span, text)] = chunk_module.bookmark_parts(
+        Path("/b.pdf"), bookmarks, spans[:1], sizes, "bk1"
+    )
+    assert "lost" not in text
+    assert (span.page_start, span.page_end) == (3, 3)
+
+
+def test_bookmark_parts_cuts_a_long_section_by_pages(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sizes = chunk_module.note_budget()
+    filler = "x" * (sizes.max_tokens // 3 * config.CHARS_PER_TOKEN)
+    _pages(monkeypatch, {page: f"page {page} {filler}" for page in range(1, 7)})
+    bookmarks = [Bookmark("A.7 Expressions", 1, 1)]
+    spans = chunk_module.spans_from_bookmarks(bookmarks, page_count=6)
+    parts = chunk_module.bookmark_parts(Path("/b.pdf"), bookmarks, spans, sizes, "bk1")
+    assert len(parts) > 1
+    assert {span.title for span, _text in parts} == {"A.7 Expressions"}
+    assert parts[0][0].page_start == 1
+    assert parts[-1][0].page_end == 6
+    assert all(
+        chunk_module.estimate_tokens(text) <= sizes.max_tokens for _span, text in parts
+    )
+
+
 def test_plan_cuts_a_forty_page_range_into_readable_chunks(monkeypatch) -> None:
     # What pressing "Run everything" on pages 13-56 actually produced: one
     # chunk of 28607 tokens, which the generate stage refused.
@@ -420,7 +515,9 @@ def test_the_two_budgets_write_to_separate_files(
     monkeypatch.setattr(chunk_module.pdf, "page_count", lambda _path: 20)
     monkeypatch.setattr(chunk_module.pdf, "read_toc", lambda _path: bookmarks)
     monkeypatch.setattr(
-        chunk_module.pdf, "page_text", lambda _p, first, last: f"text {first}-{last}"
+        chunk_module.pdf,
+        "page_text",
+        lambda _p, first, last: f"text {first}-{last} " + "x" * 400,
     )
     pdf_path = Path("/nonexistent/book.pdf")
 
@@ -442,7 +539,9 @@ def test_load_plan_reads_the_plan_of_the_budget_it_is_given(
     monkeypatch.setattr(chunk_module.pdf, "page_count", lambda _path: 20)
     monkeypatch.setattr(chunk_module.pdf, "read_toc", lambda _path: [])
     monkeypatch.setattr(
-        chunk_module.pdf, "page_text", lambda _p, first, last: f"text {first}-{last}"
+        chunk_module.pdf,
+        "page_text",
+        lambda _p, first, last: f"text {first}-{last} " + "x" * 400,
     )
     pdf_path = Path("/nonexistent/book.pdf")
     chunk_module.plan("bk1", pdf_path, page_ranges=[(1, 2)])
@@ -744,3 +843,4 @@ def test_an_appendix_after_the_last_chapter_is_not_part_of_it() -> None:
     ]
     assert chunk_module.outline_chapter(bookmarks, 210) == 8
     assert chunk_module.outline_chapter(bookmarks, 235) is None
+

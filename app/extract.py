@@ -131,27 +131,6 @@ def split_markdown_by_chapter(markdown: str) -> list[tuple[str, str]]:
     return sections
 
 
-def slice_section(markdown: str, heading: str) -> str | None:
-    """Text of one heading, down to the next heading of the same or higher level.
-
-    Used by chunking to get a section's source text out of a chapter file.
-    """
-    target = _normalise(heading)
-    for match in HEADING_RE.finditer(markdown):
-        if _normalise(match.group(2)) != target:
-            continue
-        level = len(match.group(1))
-        for following in HEADING_RE.finditer(markdown, match.end()):
-            if len(following.group(1)) <= level:
-                return markdown[match.start() : following.start()].strip()
-        return markdown[match.start() :].strip()
-    return None
-
-
-def _normalise(heading: str) -> str:
-    return re.sub(r"\s+", " ", heading).strip().casefold()
-
-
 def pages_needing_ocr(pdf_path: Path, first_page: int, last_page: int) -> list[int]:
     """Pages whose text layer is too thin to use."""
     counts = pdf.page_char_counts(pdf_path, range(first_page, last_page + 1))

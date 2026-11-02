@@ -72,25 +72,6 @@ def test_split_markdown_by_chapter_on_a_mid_chapter_page_range() -> None:
     assert extract.split_markdown_by_chapter("no headings at all") == []
 
 
-def test_slice_section_stops_at_same_level() -> None:
-    markdown = (
-        "# 2 Transistors\n\nintro\n\n"
-        "## 2.3.1 Emitter follower\n\nbody\n\n"
-        "### Detail\n\ndeep\n\n"
-        "## 2.3.2 Next\n\nother\n"
-    )
-    sliced = extract.slice_section(markdown, "2.3.1 Emitter follower")
-    assert sliced is not None
-    assert "deep" in sliced
-    assert "other" not in sliced
-
-
-def test_slice_section_is_whitespace_and_case_tolerant() -> None:
-    markdown = "## 2.3.1  Emitter   follower\n\nbody\n"
-    assert extract.slice_section(markdown, "2.3.1 emitter follower") is not None
-    assert extract.slice_section(markdown, "2.3.2 Missing") is None
-
-
 def test_bbox_to_pixels_bottom_left_origin() -> None:
     # A4-ish page, 100 pt tall box 72 pt from the bottom, 72 dpi, no padding.
     box = extract.bbox_to_pixels((72.0, 172.0, 144.0, 72.0), 792.0, dpi=72, pad_pt=0.0)
