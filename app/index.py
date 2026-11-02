@@ -22,6 +22,14 @@ NAV_RE = re.compile(r"\n---\n[^\n]*\[\[[^\n]*\n?\s*$")
 GLOSSARY_NOTE = "_Glossary.md"
 
 
+def moc_name(chapter: int, title: str, language: Language) -> str:
+    """``01 Wprowadzenie — mapa rozdziału``: never the name of the chapter's note.
+
+    The chapter's own note is ``01 Wprowadzenie``; the map sorts right after it.
+    """
+    return generate.file_stem(f"{chapter:02d} {title} — {language.chapter_map}")
+
+
 def note_name(chunk: Chunk) -> str:
     """Wikilink target of a chunk's note: the file stem."""
     return generate.note_stem(chunk)
@@ -167,10 +175,14 @@ def run(
     for chapter in sorted({chunk.chapter for chunk, _ in present if chunk.chapter}):
         in_chapter = [chunk for chunk, _ in present if chunk.chapter == chapter]
         title = chapter_titles.get(chapter, "")
-        moc_name = generate.file_stem(f"{chapter:02d} {title}")
         moc_path = (
-            generate.note_path(in_chapter[0], title, out_dir).parent / f"{moc_name}.md"
+            generate.note_path(in_chapter[0], title, out_dir).parent
+            / f"{moc_name(chapter, title, language)}.md"
         )
+        if moc_path in {path for _chunk, path in existing}:
+            # The chapter's own note was overwritten this way once, when its
+            # file took the name the map had.
+            raise ValueError(f"{moc_path.name}: the chapter map would replace a note")
         generate.write_note(
             moc_path,
             chapter_moc(

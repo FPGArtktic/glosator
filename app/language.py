@@ -33,6 +33,8 @@ class Language:
     headings: dict[str, str] = field(default_factory=dict)
     # Labels the list of sections a note covers when it merges several.
     sections: str = "Sections"
+    # Ends the file name of a chapter's map, next to the chapter's own note.
+    chapter_map: str = "chapter map"
 
     def heading(self, name: str) -> str:
         return self.headings.get(name, name)
@@ -54,6 +56,7 @@ POLISH = Language(
     reading_order="Notatki w kolejności czytania:",
     pages="strony",
     sections="Sekcje",
+    chapter_map="mapa rozdziału",
     headings={
         "In short": "W skrócie",
         "Explanation": "Wyjaśnienie",

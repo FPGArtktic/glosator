@@ -99,9 +99,9 @@ def test_run_links_notes_writes_moc_and_glossary(
 
     first = generate.note_path(chunks[0], titles[2]).read_text(encoding="utf-8")
     assert first.rstrip().endswith("[[02.03.02 Current source]]")
-    moc = (config.OUT_DIR / "02-transistors" / "02 Transistors.md").read_text(
-        encoding="utf-8"
-    )
+    moc = (
+        config.OUT_DIR / "02-transistors" / "02 Transistors — chapter map.md"
+    ).read_text(encoding="utf-8")
     assert "[[02.03.01 Emitter follower]]" in moc
     assert "chapter: 2" in moc
     glossary = (config.OUT_DIR / index.GLOSSARY_NOTE).read_text(encoding="utf-8")
@@ -159,8 +159,8 @@ def test_moc_of_an_unnamed_chapter_is_named_by_its_number() -> None:
 
     index.run(chunks, {4: ""}, book_title="Book", book_tag="isp2")
 
-    assert (config.OUT_DIR / "04" / "04.md").exists()
-    assert not (config.OUT_DIR / "04" / "04 .md").exists()
+    assert (config.OUT_DIR / "04" / "04 — chapter map.md").exists()
+    assert not (config.OUT_DIR / "04" / "04  — chapter map.md").exists()
 
 
 def test_the_glossary_carries_the_generator_marker() -> None:
@@ -219,3 +219,19 @@ def test_run_tags_the_glossary_with_the_book_field() -> None:
 
     glossary = (config.OUT_DIR / index.GLOSSARY_NOTE).read_text(encoding="utf-8")
     assert "tags: [electronics, bk1, glossary]" in glossary
+
+
+def test_the_map_of_a_chapter_leaves_the_chapter_note_alone() -> None:
+    # K&R's chapter notes are "01 Wprowadzenie", the name the map once had.
+    chunks = [
+        Chunk(1, 2, "2", "Transistors", 60, 61, Path("x.md")),
+        Chunk(2, 2, "2.1", "Basics", 62, 63, Path("y.md")),
+    ]
+    for chunk in chunks:
+        generate.write_atomic(generate.note_path(chunk, "Transistors"), NOTE)
+
+    index.run(chunks, {2: "Transistors"}, book_title="Book", book_tag="bk1")
+
+    folder = config.OUT_DIR / "02-transistors"
+    assert "type: moc" not in (folder / "02 Transistors.md").read_text(encoding="utf-8")
+    assert (folder / "02 Transistors — chapter map.md").exists()
