@@ -87,3 +87,10 @@ def test_summary_counts_notes_per_chapter() -> None:
     lines = verify.summary([written, missing])
     assert lines[0] == "chapter 2: 1/2 notes, listings 0/7 lines (0 exact), 1 flagged"
     assert lines[1].startswith("  2.1 Counting: listings")
+
+
+def test_a_line_quoted_without_its_comment_is_found() -> None:
+    source = "```\nint n = 0;\n```\n"
+    code = "int n = 0;  /* counter */"
+    checked = verify.check(report(), note(code), source, listings=True)
+    assert (checked.code_found, checked.code_exact) == (1, 0)

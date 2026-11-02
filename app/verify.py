@@ -72,12 +72,25 @@ def _check_listings(report: Report, note: str, source: str) -> None:
     squeezed = {_squeeze(line) for line in have}
     exact = set(have)
     report.code_lines = len(wanted)
-    report.code_found = sum(_squeeze(line) in squeezed for line in wanted)
+    report.code_found = sum(_found(_squeeze(line), squeezed) for line in wanted)
     report.code_exact = sum(line in exact for line in wanted)
     if wanted and report.code_found < config.VERIFY_MIN_CODE_SHARE * len(wanted):
         report.problems.append(
             f"listings: {report.code_found} of {len(wanted)} source lines in the note"
         )
+
+
+def _found(line: str, have: set[str]) -> bool:
+    """A line of the source is in the note, or inside a longer line of it.
+
+    The book quotes a program's lines in its prose ("lower = 0;") before or
+    after printing the program, where the same line carries a comment.
+    """
+    if line in have:
+        return True
+    return len(line) >= config.VERIFY_MIN_QUOTED_CHARS and any(
+        line in other for other in have
+    )
 
 
 def _code_lines(text: str) -> list[str]:

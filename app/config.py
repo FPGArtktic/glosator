@@ -106,6 +106,9 @@ LANGUAGE_SAMPLE_CHARS: int = 200_000
 # a 3,000-token chunk runs to about a third of its words.
 VERIFY_MIN_CODE_SHARE: float = 0.9
 VERIFY_MIN_WORD_SHARE: float = 0.1
+# A quoted listing line this long is found inside a longer line of the note;
+# a shorter one ("}", "n++;") would be found anywhere.
+VERIFY_MIN_QUOTED_CHARS: int = 8
 # An EPUB has no pages; extraction cuts one about this long, at the end of a
 # paragraph, so that chunking can read it like a PDF. A printed page of the
 # Helion books measured holds 2,500 to 3,000 characters.
