@@ -98,6 +98,10 @@ Polish.
   `OLLAMA_FLASH_ATTENTION=1` and `OLLAMA_KV_CACHE_TYPE=q8_0` on the Ollama
   service halve the context's memory, which leaves more of the model on the
   card; `OLLAMA_MAX_LOADED_MODELS=1` keeps it to one model at a time.
+  On a 16 GB card `gemma4:31b` runs a third of its layers on the CPU;
+  `bin/text-model` builds `gemma4-31b-q3-text`, the same model at Q3_K_M
+  without its vision projector, which fits the card whole and writes a note
+  about three times faster. Use it with `GLOSATOR_TEXT_MODEL=gemma4-31b-q3-text`.
   Ollama normally listens on `127.0.0.1`, which a container cannot reach
   through an ordinary network, so the unit runs the container with
   `pasta --map-host-loopback` and points `OLLAMA_URL` at

@@ -736,3 +736,33 @@ Three things the measured books needed:
 
 Figures are left out for now, captions kept: the vision pass crops figures
 from rendered PDF pages, and an EPUB's images would need their own path.
+
+## 2026-11-02 — On a 16 GB card the text model is gemma4:31b at Q3_K_M, text only
+
+Ollama's `gemma4:31b` is Q4_K_M, 20 GB with its vision projector. On the
+16 GB card, with the desktop moved to the integrated GPU, it ran 41 of its
+61 layers on the card and the rest on the CPU: about 800% CPU, 25% GPU.
+
+Unsloth's GGUF of the same model at Q3_K_M is 14.7 GB. With Ollama's
+projector and draft model it still put 9 layers on the CPU. The note pass
+never shows the model a picture, and the vision pass has a model of its
+own, so `bin/text-model` builds a variant without the projector, with
+`num_gpu 99`: all 61 layers on the card, 98% GPU. Four CPU threads instead
+of all sixteen keep the time and halve the CPU load, which is only waiting.
+
+The same three K&R chunks (two merged sections with a program; escape
+sequences; a 15-row precedence table), against `gemma4:31b`:
+
+| | Q4_K_M | Q3_K_M, text only |
+|---|---|---|
+| seconds per note | 144, 138, 111 | 49, 48, 38 |
+| listing lines found | 79/87, 26/39, 15/15 | 76/87, 28/39, 15/15 |
+| table rows | 16/16 | 16/16 |
+| lines in another language | 0 | 0 |
+
+Read against the source, the Q3 notes had no content error; one of them
+left out a three-line schema of a function definition that the Q4 note
+kept. Three times the speed is worth that: the queue of nine books drops
+from about 60 hours to about 20. The code default stays `gemma4:31b`,
+which needs no extra step; this machine sets
+`GLOSATOR_TEXT_MODEL=gemma4-31b-q3-text` in its unit.
