@@ -18,6 +18,12 @@ Two to four sentences: what this is and why it matters.
 ## Explanation
 Plain language, 300-700 words. Analogies are allowed but must be marked as
 analogies ("as an analogy, ..."). Explain every symbol you use.
+Every table the source prints goes into the explanation whole, as a markdown
+table next to the paragraph about it: every row and every cell as the source
+has them, also where it reaches you as a block of aligned text rather than a
+table (a list of escape sequences, an operator precedence table). A reader
+looks things up in a table; a sentence about one is no use. Tables do not
+count towards the 700 words.
 
 {{technical}}
 
@@ -80,6 +86,10 @@ made a note that reads well and teaches something false:
   Never write \[ \] or \( \): they do not render.
 - Do not write a title heading, a figure section, or frontmatter.
 - Do not add a summary at the end; that is what "In short" is for.
+- Every sentence is in {{language}}, also the line under a code block, the
+  header row of a table and its cells of prose, even where the source text
+  or a quoted program is in another language. Only the section headings,
+  code and terms quoted from code stay as they are.
 
 --- SOURCE TEXT ---
 {{text}}
