@@ -824,8 +824,8 @@ that asks for the lines to be explained, the commands to go to the code
 section whole, and a diagram's label soup not to be listed. The hard rules
 stay: the note says nothing the slides do not.
 
-What the slides leave unsaid is not the local model's to add. For the
-Bootlin notes, a later pass by Claude Haiku appends a section of its own,
-marked as coming from outside the slides, after the note is written; the
-note above it stays what the slides say.
+What the slides leave unsaid is not the local model's to add, and no other
+model adds it either: a pass by a hosted model over some 400 notes was
+considered and dropped for its cost in the operator's usage limit. The
+notes say what the slides say.
 
