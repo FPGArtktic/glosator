@@ -71,7 +71,10 @@ def _lines(glyphs: Sequence[Glyph]) -> list[list[Glyph]]:
 def _line_text(line: Sequence[Glyph], margin: float, cell: float) -> str:
     text = " " * _spaces(line[0].left - margin, cell)
     for before, glyph in pairwise(line):
-        text += before.text + " " * _spaces(glyph.left - before.right, cell)
+        spaces = _spaces(glyph.left - before.right, cell)
+        if spaces == 0 and glyph.space_before:
+            spaces = 1
+        text += before.text + " " * spaces
     return text + line[-1].text
 
 

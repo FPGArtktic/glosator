@@ -139,3 +139,12 @@ def test_a_word_space_a_fifth_of_a_cell_wide_is_kept() -> None:
 
 def test_a_typeset_minus_and_asterisk_become_ascii() -> None:
     assert listing.layout(monospaced("p\u2212>next = \u2217q;")) == "p->next = *q;"
+
+
+def test_a_word_break_the_text_layer_has_survives_a_closed_gap() -> None:
+    glyphs = monospaced("ab")
+    after = glyphs[-1]
+    glyphs.append(
+        Glyph("c", after.right, after.bottom, after.right + CELL, after.top, True)
+    )
+    assert listing.layout(glyphs) == "ab c"

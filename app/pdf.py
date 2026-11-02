@@ -42,6 +42,9 @@ class Glyph:
     bottom: float
     right: float
     top: float
+    # The character before it in the text layer is a space: the word break
+    # pdfium sees, even where italics close the gap to nothing on the page.
+    space_before: bool = False
 
     @property
     def middle(self) -> float:
@@ -114,24 +117,32 @@ def page_glyphs(pdf_path: Path, page: int) -> list[Glyph]:
     with _document(pdf_path) as pdf:
         textpage = pdf[page - 1].get_textpage()
         try:
-            return [
-                glyph
-                for index in range(textpage.count_chars())
-                if (glyph := _glyph(textpage, index)) is not None
-            ]
+            return _glyphs(textpage)
         finally:
             textpage.close()
 
 
-def _glyph(textpage, index: int) -> Glyph | None:
-    text = textpage.get_text_range(index, 1)
-    if not text.strip():
-        return None
+def _glyphs(textpage) -> list[Glyph]:
+    glyphs = []
+    space_before = False
+    for index in range(textpage.count_chars()):
+        text = textpage.get_text_range(index, 1)
+        if not text.strip():
+            space_before = True
+            continue
+        glyph = _glyph(textpage, index, text, space_before)
+        space_before = False
+        if glyph is not None:
+            glyphs.append(glyph)
+    return glyphs
+
+
+def _glyph(textpage, index: int, text: str, space_before: bool) -> Glyph | None:
     angle = pdfium_c.FPDFText_GetCharAngle(textpage.raw, index)
     if min(angle, 2 * math.pi - angle) > UPRIGHT_TOLERANCE_RAD:
         return None
     left, bottom, right, top = textpage.get_charbox(index, loose=True)
-    return Glyph(text, left, bottom, right, top)
+    return Glyph(text, left, bottom, right, top, space_before)
 
 
 def _page_texts(pdf: pdfium.PdfDocument, pages: Iterable[int]) -> Iterator[str]:
