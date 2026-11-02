@@ -859,3 +859,17 @@ def test_plan_leaves_out_the_contents_and_the_index(
     chunks = chunk_module.plan("bk1", Path("/nonexistent/book.pdf"))
     assert [item.title for item in chunks] == ["Start"]
     assert (chunks[0].page_start, chunks[0].page_end) == (3, 8)
+
+
+def test_a_trusted_outline_names_its_chunk_despite_a_numbered_line() -> None:
+    span = Span("Glossary", 0, 320, 330)
+    text = "Glossary\n\n19.1 Explain the difference between two orders\n"
+    assert chunk_module.identify(span, text, 54)[1:] == (
+        "19.1",
+        "Explain the difference between two orders",
+    )
+    assert chunk_module.identify(span, text, 54, trusted=True)[1:] == (
+        "054",
+        "Glossary",
+    )
+

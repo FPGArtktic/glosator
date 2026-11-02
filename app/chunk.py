@@ -18,7 +18,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from app import book, config, extract, log
+from app import book, config, epub, extract, log
 from app.pdf import Bookmark
 
 SECTION_RE = re.compile(r"^\s*(\d+(?:\.\d+)*)\.?\s+(.*\S)\s*$")
@@ -223,6 +223,8 @@ def identify(
     text: str,
     order: int,
     carried: tuple[str, str] | None = None,
+    *,
+    trusted: bool = False,
 ) -> tuple[int | None, str, str]:
     """Chapter, section number and title for a chunk.
 
@@ -231,9 +233,15 @@ def identify(
     us. A chunk with no head of its own continues ``carried``, the last head
     the chunks before it showed, as long as the outline puts both in the same
     chapter. Failing all of that, the chunk is numbered by its position.
+
+    A ``trusted`` outline, an EPUB's table of contents, names its chunks
+    itself: there, a numbered line in the text is an exercise ("4.12 Rozważ
+    system pamięci...") or a glossary entry, not a head.
     """
     if span.section:
         return span.chapter, span.section, section_title(span.title)
+    if trusted:
+        return span.chapter, f"{order:03d}", section_title(span.title)
     head = running_head(text, span.chapter)
     if head:
         number, title = head
@@ -814,7 +822,9 @@ def plan(
     for order, group in enumerate(groups, start=1):
         head = group[0]
         text = "\n\n".join(text_by_span[span] for span in group).strip()
-        chapter, number, title = identify(head, text, order, carried)
+        chapter, number, title = identify(
+            head, text, order, carried, trusted=epub.is_epub(pdf_path)
+        )
         if number in used and not title.endswith(CONTINUED):
             title = f"{title}{CONTINUED}"
         carried = next(reversed(headings(text, head.chapter)), carried)
