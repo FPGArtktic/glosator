@@ -19,7 +19,7 @@ from pathlib import Path
 from app import config, extract, listing, log, ollama, verify
 from app.chunk import Chunk, estimate_tokens
 from app.extract import Figure
-from app.language import ENGLISH, Language
+from app.language import ENGLISH, NOTHING_HERE, Language
 
 PLACEHOLDER_RE = re.compile(r"\{\{(\w+)\}\}")
 
@@ -173,6 +173,8 @@ def assemble(
         merged["Figures"] = figures_md
     for name in SECTION_ORDER:
         text = merged.get(name, "").strip()
+        if text == NOTHING_HERE:
+            text = language.nothing_here
         if text:
             body.append(f"## {language.heading(name)}\n\n{text}")
     return "\n\n".join(body) + "\n"

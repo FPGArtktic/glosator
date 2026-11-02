@@ -18,6 +18,9 @@ from app import config
 POLISH_LETTERS = frozenset("ąćęłńóśźżĄĆĘŁŃÓŚŹŻ")
 
 
+NOTHING_HERE = "None in this section."
+
+
 @dataclass(frozen=True)
 class Language:
     code: str
@@ -35,6 +38,9 @@ class Language:
     sections: str = "Sections"
     # Ends the file name of a chapter's map, next to the chapter's own note.
     chapter_map: str = "chapter map"
+    # What a section with nothing to hold says: the prompt quotes it in
+    # English, and the model copies the quote rather than translate it.
+    nothing_here: str = NOTHING_HERE
 
     def heading(self, name: str) -> str:
         return self.headings.get(name, name)
@@ -57,6 +63,7 @@ POLISH = Language(
     pages="strony",
     sections="Sekcje",
     chapter_map="mapa rozdziału",
+    nothing_here="Brak w tej sekcji.",
     headings={
         "In short": "W skrócie",
         "Explanation": "Wyjaśnienie",

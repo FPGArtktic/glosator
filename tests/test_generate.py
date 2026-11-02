@@ -178,6 +178,17 @@ def test_assemble_omits_sections_the_model_left_out(chunk: Chunk) -> None:
     assert "## Figures" not in note
 
 
+def test_assemble_says_there_is_nothing_in_the_notes_language(chunk: Chunk) -> None:
+    sections = {"In short": "a", "Formulas": "None in this section."}
+    note = generate.assemble(
+        chunk, sections, "", "Book", "bk1", "gemma3", language=POLISH
+    )
+    assert "Brak w tej sekcji." in note
+    assert "None in this section." not in note
+    english = generate.assemble(chunk, sections, "", "Book", "bk1", "gemma3")
+    assert "None in this section." in english
+
+
 def test_note_path_follows_the_vault_layout(chunk: Chunk) -> None:
     path = generate.note_path(chunk, "Transistors")
     assert path == config.OUT_DIR / "02-transistors" / "02.03.01 Emitter follower.md"
