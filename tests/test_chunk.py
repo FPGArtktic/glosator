@@ -841,3 +841,21 @@ def test_readable_text_keeps_a_blank_extracted_page_blank(
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n", encoding="utf-8")
     assert chunk_module.readable_text(Path("/b.pdf"), 1, 2, "bk1") == "Footer 1 0f1e"
+
+
+def test_plan_leaves_out_the_contents_and_the_index(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bookmarks = [
+        Bookmark("Spis treści", 0, 1),
+        Bookmark("1 Start", 0, 3),
+        Bookmark("Index", 0, 9),
+    ]
+    monkeypatch.setattr(pdf, "page_count", lambda _path: 10)
+    monkeypatch.setattr(pdf, "read_toc", lambda _path: bookmarks)
+    monkeypatch.setattr(
+        pdf, "page_text", lambda _p, first, _l: f"page {first} " + "x" * 400
+    )
+    chunks = chunk_module.plan("bk1", Path("/nonexistent/book.pdf"))
+    assert [item.title for item in chunks] == ["Start"]
+    assert (chunks[0].page_start, chunks[0].page_end) == (3, 8)

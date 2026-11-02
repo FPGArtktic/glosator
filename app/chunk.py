@@ -38,6 +38,18 @@ CONTENTS_ENTRY_RE = re.compile(r"^[^\n]*?(?:\.\s?){4,}\s*\d{1,4}[ \t]*$", re.MUL
 PAGE_SEPARATOR = "\n\n"
 LINE_RE = re.compile(r"^.*$", re.MULTILINE)
 NON_LETTERS_RE = re.compile(r"[\W_]+")
+# Bookmarks of a book's apparatus, compared as _letters gives them.
+APPARATUS_TITLES = frozenset(
+    {
+        "spistreści",
+        "contents",
+        "tableofcontents",
+        "skorowidz",
+        "index",
+        "stronatytułowa",
+        "stronaredakcyjna",
+    }
+)
 # A heading this short ("## 4") begins too many titles to stand for one.
 TITLE_PREFIX_MIN_CHARS = 6
 CONTINUED = " (continued)"
@@ -455,6 +467,22 @@ def balanced_slices(pages: dict[int, str], sizes: Budget) -> list[tuple[int, int
     return greedy
 
 
+def _without_apparatus(spans: Sequence[Span], book_slug: str) -> list[Span]:
+    """Leave out the contents, the index and the title pages.
+
+    A note about a table of contents or an index is a list of headings
+    with page numbers; the model writes one, and its time is spent for
+    nothing. An operator who selects such a bookmark still gets it.
+    """
+    kept = []
+    for span in spans:
+        if _letters(span.title) in APPARATUS_TITLES:
+            log.event("chunk", "apparatus left out", book=book_slug, title=span.title)
+            continue
+        kept.append(span)
+    return kept
+
+
 def _drop_empty(
     groups: list[list[Span]], text_by_span: dict[Span, str], book_slug: str
 ) -> list[list[Span]]:
@@ -751,6 +779,8 @@ def plan(
             if by_section
             else spans_from_bookmarks(bookmarks, page_total, selected)
         )
+        if not selected:
+            spans = _without_apparatus(spans, book_slug)
     if not spans:
         raise ValueError("no bookmarks selected and no page ranges given")
 
