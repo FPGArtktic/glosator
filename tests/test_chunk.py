@@ -938,3 +938,53 @@ def test_the_second_part_of_an_unnumbered_section_is_a_continuation(
     assert titles[0] == "Details"
     assert titles[1] == f"Details{chunk_module.CONTINUED}"
     assert titles[-1] == "Summary"
+
+
+# A training course's outline: modules, sections, slides, and none numbered.
+COURSE_OUTLINE = [
+    Bookmark("Shell scripting training", 0, 1),
+    Bookmark("About the trainer", 0, 2),
+    Bookmark("Generic course information", 0, 3),
+    Bookmark("Training goals", 1, 3),
+    Bookmark("Variables and quoting", 0, 5),
+    Bookmark("Variables", 1, 5),
+    Bookmark("Assigning a value", 2, 5),
+    Bookmark("Quoting", 1, 7),
+    Bookmark("Exit codes", 0, 9),
+    Bookmark("Last slides", 0, 10),
+    Bookmark("Thank you", 1, 10),
+]
+
+
+def test_an_unnumbered_outline_is_numbered_by_module_and_section() -> None:
+    numbered = chunk_module.number_outline(COURSE_OUTLINE)
+    assert [mark.title for mark in numbered] == [
+        # The title slide and the trainer's slide, before the first module,
+        # are left out; the apparatus stays for the plan to leave out.
+        "Generic course information",
+        "Training goals",
+        "1 Variables and quoting",
+        "1.1 Variables",
+        "Assigning a value",
+        "1.2 Quoting",
+        # A module with no sections is a chapter all the same.
+        "2 Exit codes",
+        "Last slides",
+        "Thank you",
+    ]
+
+
+def test_a_numbered_outline_keeps_its_own_numbers() -> None:
+    outline = [
+        Bookmark("Rozdział 1. Wstęp", 0, 1),
+        Bookmark("Pierwszy program", 1, 2),
+        Bookmark("Rozdział 2. Typy", 0, 9),
+    ]
+    assert chunk_module.number_outline(outline) == outline
+
+
+def test_apparatus_beside_a_section_is_not_part_of_it() -> None:
+    numbered = chunk_module.number_outline(COURSE_OUTLINE)
+    ranges = chunk_module.section_ranges(numbered, 11)
+    assert ("2 Exit codes", 9, 9) in ranges
+    assert ("Last slides", 10, 11) in ranges

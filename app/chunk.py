@@ -15,7 +15,7 @@ import json
 import re
 from collections import Counter
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from app import book, config, epub, extract, log
@@ -56,6 +56,14 @@ APPARATUS_TITLES = frozenset(
         "bibliography",
         "references",
         "odwołanialiteraturowe",
+        # A training course's slides open with the trainer's company and the
+        # course's practicalities, and close with a feedback form; its lab
+        # book opens with a document history and a licence.
+        "aboutbootlin",
+        "genericcourseinformation",
+        "lastslides",
+        "aboutthisdocument",
+        "copyingthisdocument",
     }
 )
 # A heading this short ("## 4") begins too many titles to stand for one.
@@ -275,6 +283,61 @@ def _same_chapter(number: str, chapter: int | None) -> bool:
     return chapter is None or int(number.split(".")[0]) == chapter
 
 
+def number_outline(bookmarks: Sequence[Bookmark]) -> list[Bookmark]:
+    """Chapter and section numbers for an outline that has none at all.
+
+    A training course's slides name their modules and the sections in them
+    with no number ("Using Yocto Project - basics"), and their slides one
+    level further down. Without numbers no chunk is in a chapter, chunks run
+    across modules, and a note is named after whichever slide it starts on.
+    Numbered here, the outline is a deep one, like the LPI materials': a
+    module is a chapter, its sections are N.k, a slide is part of a section.
+
+    Every top-level bookmark but the apparatus is a chapter, also one with
+    nothing under it ("Licensing", a page long). Before the first one that
+    has bookmarks under it, such a bookmark is the course's title slide and
+    is left out with its pages.
+    """
+    numbered = any(
+        extract.is_chapter_heading(mark.title) for mark in bookmarks if mark.level == 0
+    ) or any(section_number(mark.title) is not None for mark in bookmarks)
+    if numbered:
+        return list(bookmarks)
+
+    def apparatus(mark: Bookmark) -> bool:
+        return _letters(mark.title) in APPARATUS_TITLES
+
+    def has_children(index: int) -> bool:
+        return index + 1 < len(bookmarks) and bookmarks[index + 1].level > 0
+
+    first = next(
+        (
+            index
+            for index, mark in enumerate(bookmarks)
+            if mark.level == 0 and has_children(index) and not apparatus(mark)
+        ),
+        len(bookmarks),
+    )
+    result: list[Bookmark] = []
+    chapter = section = 0
+    in_chapter = False
+    for index, mark in enumerate(bookmarks):
+        if mark.level == 0:
+            if index < first and not apparatus(mark) and not has_children(index):
+                in_chapter = False
+                continue
+            in_chapter = index >= first and not apparatus(mark)
+            if in_chapter:
+                chapter += 1
+                section = 0
+                mark = replace(mark, title=f"{chapter} {mark.title}")
+        elif mark.level == 1 and in_chapter:
+            section += 1
+            mark = replace(mark, title=f"{chapter}.{section} {mark.title}")
+        result.append(mark)
+    return result
+
+
 def outline_chapter(bookmarks: Sequence[Bookmark], page: int) -> int | None:
     """Chapter of the last numbered chapter bookmark at or before ``page``.
 
@@ -418,14 +481,22 @@ def section_ranges(
     always the section's own. A range ends where the next section begins.
     Bookmarks before the first numbered one keep their own titles.
     """
-    owners: list[tuple[str, int]] = []
+    owners: list[tuple[str, int, int]] = []
     for mark in sorted(bookmarks, key=lambda mark: mark.page):
         number = section_number(mark.title)
         current = section_number(owners[-1][0]) if owners else None
-        if not owners or (number is not None and number != current):
-            owners.append((mark.title, mark.page))
+        # Apparatus beside the section, not under it, is no part of it: "Last
+        # slides" after a course's last module is left out, not its last page.
+        beside = (
+            bool(owners)
+            and number is None
+            and mark.level <= owners[-1][2]
+            and _letters(mark.title) in APPARATUS_TITLES
+        )
+        if not owners or (number is not None and number != current) or beside:
+            owners.append((mark.title, mark.page, mark.level))
     ranges: list[tuple[str, int, int]] = []
-    for index, (title, first_page) in enumerate(owners):
+    for index, (title, first_page, _level) in enumerate(owners):
         following = owners[index + 1][1] if index + 1 < len(owners) else None
         last_page = page_count if following is None else max(following - 1, first_page)
         ranges.append((title, first_page, last_page))
@@ -772,6 +843,15 @@ def _letters(text: str) -> str:
     return NON_LETTERS_RE.sub("", text).casefold()
 
 
+def toc(path: Path) -> list[Bookmark]:
+    """The outline chunking works from: a PDF's numbered where it has no numbers.
+
+    An EPUB's table of contents names its chunks as they are (see identify).
+    """
+    bookmarks = book.read_toc(path)
+    return bookmarks if epub.is_epub(path) else number_outline(bookmarks)
+
+
 def plan(
     book_slug: str,
     pdf_path: Path,
@@ -785,7 +865,7 @@ def plan(
     page_total = book.page_count(pdf_path)
     by_section = False
     if page_ranges:
-        bookmarks = book.read_toc(pdf_path)
+        bookmarks = toc(pdf_path)
         spans = [
             Span(
                 f"pages {start}-{end}", 0, start, end, outline_chapter(bookmarks, start)
@@ -801,7 +881,7 @@ def plan(
             )
         ]
     else:
-        bookmarks = book.read_toc(pdf_path)
+        bookmarks = toc(pdf_path)
         for problem in outline_problems(bookmarks):
             log.event("chunk", "outline problem", book=book_slug, problem=problem)
         by_section = is_deep_outline(bookmarks)

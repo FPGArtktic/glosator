@@ -68,7 +68,7 @@ def toc_labels(pdf_path: Path) -> list[str]:
     """Indented bookmark titles. The indent shows the tree; the value is the title."""
     return [
         f"{'    ' * mark.level}{mark.title}  (p. {mark.page})"
-        for mark in book.read_toc(pdf_path)
+        for mark in chunk_module.toc(pdf_path)
     ]
 
 
@@ -337,7 +337,7 @@ def build() -> gr.Blocks:
             if not titles:
                 raise gr.Error("select sections or give page ranges")
             spans = chunk_module.spans_from_bookmarks(
-                book.read_toc(path), book.page_count(path), titles
+                chunk_module.toc(path), book.page_count(path), titles
             )
             return (
                 path,
@@ -361,7 +361,7 @@ def build() -> gr.Blocks:
 
         def on_load_toc(books, choice, uploaded):
             path = resolve_pdf(books, choice, uploaded)
-            bookmarks = book.read_toc(path)
+            bookmarks = chunk_module.toc(path)
             problems = chunk_module.outline_problems(bookmarks)
             message = f"{len(bookmarks)} bookmarks loaded."
             if problems:
