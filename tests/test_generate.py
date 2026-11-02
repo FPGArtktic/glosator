@@ -170,7 +170,7 @@ def test_assemble_omits_sections_the_model_left_out(chunk: Chunk) -> None:
 
 def test_note_path_follows_the_vault_layout(chunk: Chunk) -> None:
     path = generate.note_path(chunk, "Transistors")
-    assert path == config.OUT_DIR / "02-transistors" / "2.3.1 Emitter follower.md"
+    assert path == config.OUT_DIR / "02-transistors" / "02.03.01 Emitter follower.md"
     unnumbered = Chunk(1, None, "001", "Preface", 1, 2, Path("x.md"))
     assert generate.note_path(unnumbered, "").parent.name == "00-unsorted"
 
@@ -305,7 +305,7 @@ def test_note_path_keeps_a_slashed_title_in_one_file() -> None:
     # "6.3 SSI / MSI Blocks" made a directory "6.3 SSI " in the first full run.
     chunk = Chunk(1, 6, "6.3", "SSI / MSI Blocks", 1, 2, Path("x.md"))
     path = generate.note_path(chunk, "")
-    assert path == config.OUT_DIR / "06" / "6.3 SSI-MSI Blocks.md"
+    assert path == config.OUT_DIR / "06" / "06.03 SSI-MSI Blocks.md"
 
 
 @pytest.mark.parametrize(
@@ -417,7 +417,7 @@ def test_run_normalises_math_from_the_model(
 def test_note_path_uses_the_chapter_number_when_the_title_is_unknown() -> None:
     chunk = Chunk(1, 4, "4.07", "Limits of the sampling method", 99, 102, Path("x.md"))
     path = generate.note_path(chunk, "")
-    assert path == config.OUT_DIR / "04" / "4.07 Limits of the sampling method.md"
+    assert path == config.OUT_DIR / "04" / "04.07 Limits of the sampling method.md"
 
 
 def test_the_domain_is_the_first_tag_of_every_note(chunk: Chunk) -> None:
@@ -628,3 +628,12 @@ def test_run_keeps_the_better_answer_when_both_fail(
         domain="programming",
     )
     assert "int a = 1;" in path.read_text(encoding="utf-8")
+
+
+def test_section_numbers_are_padded_so_names_sort() -> None:
+    assert generate.padded_section("1.2") == "01.02"
+    assert generate.padded_section("1.10") == "01.10"
+    assert generate.padded_section("101.1") == "101.01"
+    assert generate.padded_section("003") == "003"
+    assert generate.padded_section("4.11-2") == "04.11-02"
+    assert sorted(["01.10", "01.02", "01"]) == ["01", "01.02", "01.10"]

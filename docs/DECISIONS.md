@@ -783,3 +783,21 @@ way. So `generate` checks each answer as `glosator verify` would and asks
 once more when it fails, keeping the better of the two. The chat template
 was ruled out on the way: Q3_K_M with Ollama's gemma4 renderer and with the
 GGUF's own template kept the same lines.
+
+## 2026-11-02 — Note names carry padded section numbers; a chapter note is its number
+
+The output contract has always said `<NN-chapter>/<NN.MM title>.md`; the
+code wrote `1.10 Title.md`, and a file list sorted 1.10 before 1.2 and 4.11
+before 4.2. A chapter's own bookmark ("Rozdział 1. Wprowadzenie") has no
+section number, so its note was named by its place in the plan, "003
+Rozdział 1. Wprowadzenie", and its chapter folder by the number alone,
+"01". K&R's outline writes "1.8.Argumenty" without a space, and that note
+became "008 1.8.Argumenty".
+
+Now every number of a section is padded to two digits in the file name and
+the wikilinks (`01.10`, `101.01`), the heading inside the note keeps the
+book's form (`# 1.10 ...`), a chapter bookmark becomes section `1` titled
+"Wprowadzenie" and names its folder `01-wprowadzenie`, and a section number
+may be followed by its dot without a space. Notes written before keep their
+names; a book regenerated after this gets the new ones, and its index links
+them.

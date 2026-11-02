@@ -21,7 +21,11 @@ from pathlib import Path
 from app import book, config, epub, extract, log
 from app.pdf import Bookmark
 
-SECTION_RE = re.compile(r"^\s*(\d+(?:\.\d+)*)\.?\s+(.*\S)\s*$")
+CHAPTER_PREFIX_RE = re.compile(
+    r"^\s*(?:chapter|rozdzia[lł])?\s*\d{1,2}\b\.?\s*[-—:.]?\s*", re.IGNORECASE
+)
+# "1.8.Argumenty": K&R's outline leaves out the space after a number's dot.
+SECTION_RE = re.compile(r"^\s*(\d+(?:\.\d+)*)(?:\.\s*|\s+)(\D.*\S|\D)\s*$")
 
 # The running head a textbook prints on every page of a section:
 # "4.07 Limits of the sampling method 214", the trailing number being the
@@ -159,6 +163,12 @@ def section_title(title: str) -> str:
     return match.group(2) if match else title.strip()
 
 
+def chapter_name(title: str) -> str:
+    """ "Rozdział 1. Wprowadzenie" as "Wprowadzenie"; the number is the section."""
+    name = CHAPTER_PREFIX_RE.sub("", title).strip()
+    return name or title.strip()
+
+
 def running_head(text: str, chapter: int | None = None) -> tuple[str, str] | None:
     """Section number and title from the running head, or ``None``.
 
@@ -247,6 +257,8 @@ def identify(
     """
     if span.section:
         return span.chapter, span.section, section_title(span.title)
+    if span.chapter is not None and extract.is_chapter_heading(span.title):
+        return span.chapter, str(span.chapter), chapter_name(span.title)
     if trusted:
         return span.chapter, f"{order:03d}", section_title(span.title)
     head = running_head(text, span.chapter)

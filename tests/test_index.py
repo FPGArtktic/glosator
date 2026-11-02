@@ -98,11 +98,11 @@ def test_run_links_notes_writes_moc_and_glossary(
     written = index.run(chunks, titles, book_title="Book", book_tag="bk1")
 
     first = generate.note_path(chunks[0], titles[2]).read_text(encoding="utf-8")
-    assert first.rstrip().endswith("[[2.3.2 Current source]]")
+    assert first.rstrip().endswith("[[02.03.02 Current source]]")
     moc = (config.OUT_DIR / "02-transistors" / "02 Transistors.md").read_text(
         encoding="utf-8"
     )
-    assert "[[2.3.1 Emitter follower]]" in moc
+    assert "[[02.03.01 Emitter follower]]" in moc
     assert "chapter: 2" in moc
     glossary = (config.OUT_DIR / index.GLOSSARY_NOTE).read_text(encoding="utf-8")
     assert "wtórnik emiterowy" in glossary
@@ -130,7 +130,7 @@ def test_run_leaves_a_foreign_file_at_a_note_path_alone() -> None:
 
     assert mine.read_text(encoding="utf-8") == "hand-written, not glosator's\n"
     other = generate.note_path(chunks[1], titles[2]).read_text(encoding="utf-8")
-    assert "[[2.3.1 Emitter follower]]" not in other
+    assert "[[02.03.01 Emitter follower]]" not in other
 
 
 def test_run_writes_into_the_given_output_folder(tmp_path: Path) -> None:

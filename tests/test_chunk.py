@@ -908,3 +908,18 @@ def test_a_single_section_chunk_has_no_parts() -> None:
     assert chunk_module.merged_parts([Span("1.6. Arrays", 1, 3, 3)]) == ()
     split = [Span("1.6. Arrays", 1, 3, 3), Span("1.6. Arrays", 1, 4, 4)]
     assert chunk_module.merged_parts(split) == ()
+
+
+def test_a_section_number_without_a_space_after_its_dot() -> None:
+    assert chunk_module.section_number("1.8.Arguments - by value") == "1.8"
+    assert (
+        chunk_module.section_title("1.8.Arguments - by value") == "Arguments - by value"
+    )
+    assert chunk_module.section_number("3.5mm jack") is None
+    assert chunk_module.section_number("2024 Edition") == "2024"
+
+
+def test_a_chapter_bookmark_is_numbered_as_its_chapter() -> None:
+    span = Span("Rozdział 5. Wskaźniki i tablice", 0, 113, 117)
+    assert chunk_module.identify(span, "text", 23) == (5, "5", "Wskaźniki i tablice")
+    assert chunk_module.chapter_name("Chapter 2 - Transistors") == "Transistors"

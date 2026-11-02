@@ -28,6 +28,7 @@ PLACEHOLDER_RE = re.compile(r"\{\{(\w+)\}\}")
 MATH_DISPLAY_RE = re.compile(r"\\\[(.+?)\\\]", re.DOTALL)
 MATH_INLINE_RE = re.compile(r"\\\((.+?)\\\)", re.DOTALL)
 SECTION_RE = re.compile(r"^##\s+(.*\S)\s*$", re.MULTILINE)
+SECTION_NUMBER_RE = re.compile(r"\d+")
 
 # A section title becomes a file name and a wikilink target. A slash in it
 # ("SSI / MSI Blocks", "TTL/CMOS") would make a directory; the rest are
@@ -202,8 +203,17 @@ def file_stem(text: str) -> str:
 
 
 def note_stem(chunk: Chunk) -> str:
-    """File stem of a chunk's per-chunk outputs: ``<section> <Title>``."""
-    return file_stem(f"{chunk.section} {chunk.title}")
+    """File stem of a chunk's per-chunk outputs: ``<NN.MM> <Title>``.
+
+    Each number of the section is padded to two digits. A file list sorts
+    by name, which put 1.10 before 1.2 and 4.11 before 4.2.
+    """
+    return file_stem(f"{padded_section(chunk.section)} {chunk.title}")
+
+
+def padded_section(section: str) -> str:
+    """``1.2`` as ``01.02``; ``101.1`` as ``101.01``; ``003`` as it is."""
+    return SECTION_NUMBER_RE.sub(lambda match: match.group(0).zfill(2), section)
 
 
 def note_path(

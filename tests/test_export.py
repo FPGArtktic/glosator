@@ -40,7 +40,7 @@ def test_the_export_tree_mirrors_the_notes_tree(chunk: Chunk) -> None:
         / "_source"
         / "bk1"
         / "02-transistors"
-        / "2.3.1 Emitter follower.md"
+        / "02.03.01 Emitter follower.md"
     )
 
 
