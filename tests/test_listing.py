@@ -115,3 +115,23 @@ def test_a_programming_book_is_extracted_without_formulas() -> None:
     settings = extract._batch_settings(1, 2, "eng", 0, "", listings=True)
     assert settings["listings"] is True
     assert settings["formulas"] is False
+
+
+def test_a_kerning_gap_inside_a_word_is_not_a_space() -> None:
+    glyphs = monospaced("total;")
+    left = glyphs[-1].right + CELL
+    for character in "word":
+        glyphs.append(Glyph(character, left, TOP - HEIGHT, left + 3.0, TOP))
+        left += 3.3
+    assert listing.layout(glyphs) == "total; word"
+
+
+def test_a_word_space_a_fifth_of_a_cell_wide_is_kept() -> None:
+    glyphs = monospaced("total;")
+    left = glyphs[-1].right + CELL
+    for word in ("do", "it"):
+        for character in word:
+            glyphs.append(Glyph(character, left, TOP - HEIGHT, left + 3.0, TOP))
+            left += 3.0
+        left += 1.2
+    assert listing.layout(glyphs) == "total; do it"

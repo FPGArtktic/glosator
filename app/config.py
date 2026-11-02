@@ -164,8 +164,10 @@ LISTING_BOX_MARGIN_PT: float = 2.0
 # a character's height. Punctuation sits lower than letters, by less than this.
 LISTING_LINE_TOLERANCE: float = 0.5
 # A gap narrower than one character cell but wider than this share of one is
-# a word space. Comments in a proportional font have spaces that narrow.
-LISTING_WORD_GAP: float = 0.3
+# a word space. Comments in a proportional font have spaces that narrow: on
+# two of the pilot books 0.9-2.1 pt against a 3.75-4.26 pt cell, while the
+# gaps between letters stayed under 0.1 pt.
+LISTING_WORD_GAP: float = 0.15
 
 # A bought ebook can carry a per-copy watermark: one hex digest in the footer
 # of every page, which docling merges into the text. A digest is taken for a
