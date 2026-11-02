@@ -26,6 +26,7 @@ FENCE_RE = re.compile(r"^```[^\n]*\n(.*?)^```", re.MULTILINE | re.DOTALL)
 DIGEST_RE = re.compile(r"\b(?=[0-9a-f]*[a-f])(?=[0-9a-f]*\d)[0-9a-f]{32}\b")
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 WORD_RE = re.compile(r"\w+")
+TABLE_RULE_RE = re.compile(r"^\|[\s:|-]+\|$")
 
 
 @dataclass
@@ -38,6 +39,8 @@ class Report:
     code_lines: int = 0
     code_found: int = 0
     code_exact: int = 0
+    table_rows: int = 0
+    table_found: int = 0
     problems: list[str] = field(default_factory=list)
 
 
@@ -51,6 +54,7 @@ def check(report: Report, note: str, source: str, *, listings: bool) -> Report:
         report.problems.append(f"mail address not in the source: {sorted(stray)[0]}")
     if listings:
         _check_listings(report, note, source)
+    _check_tables(report, note, source)
     note_words = len(WORD_RE.findall(note))
     source_words = len(WORD_RE.findall(source))
     if source_words and note_words < config.VERIFY_MIN_WORD_SHARE * source_words:
@@ -91,6 +95,31 @@ def _found(line: str, have: set[str]) -> bool:
     return len(line) >= config.VERIFY_MIN_QUOTED_CHARS and any(
         line in other for other in have
     )
+
+
+def _check_tables(report: Report, note: str, source: str) -> None:
+    """Every row of the source's tables should be a row of the note's."""
+    wanted = _table_rows(source)
+    have = set(_table_rows(note))
+    report.table_rows = len(wanted)
+    report.table_found = sum(row in have for row in wanted)
+    if wanted and report.table_found < config.VERIFY_MIN_TABLE_SHARE * len(wanted):
+        report.problems.append(
+            f"tables: {report.table_found} of {len(wanted)} source rows in the note"
+        )
+
+
+def _table_rows(text: str) -> list[str]:
+    """Rows of the markdown tables in the text, cells squeezed, rules left out."""
+    rows = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line.startswith("|") or TABLE_RULE_RE.match(line):
+            continue
+        cells = [_squeeze(cell) for cell in line.strip("|").split("|")]
+        if any(cells):
+            rows.append("|".join(cells))
+    return rows
 
 
 def _code_lines(text: str) -> list[str]:
@@ -149,6 +178,10 @@ def summary(reports: Sequence[Report]) -> list[str]:
         found = sum(report.code_found for report in written)
         exact = sum(report.code_exact for report in written)
         listing = f", listings {found}/{code} lines ({exact} exact)" if code else ""
+        rows = sum(report.table_rows for report in written)
+        if rows:
+            found_rows = sum(report.table_found for report in written)
+            listing += f", tables {found_rows}/{rows} rows"
         flagged = sum(bool(report.problems) for report in written)
         name = "unsorted" if chapter is None else f"chapter {chapter}"
         lines.append(

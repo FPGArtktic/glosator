@@ -94,3 +94,23 @@ def test_a_line_quoted_without_its_comment_is_found() -> None:
     code = "int n = 0;  /* counter */"
     checked = verify.check(report(), note(code), source, listings=True)
     assert (checked.code_found, checked.code_exact) == (1, 0)
+
+
+TABLE = (
+    "| Operators | Associativity |\n|---|---|\n"
+    "| () [] | left to right |\n| ! ~ | right to left |\n"
+)
+
+
+def test_a_table_copied_whole_passes_and_a_summarised_one_is_a_problem() -> None:
+    copied = note("") + (
+        "\n|Operators|Associativity|\n|:-|:-|\n"
+        "|() []|left to right|\n|! ~|right to left|\n"
+    )
+    checked = verify.check(report(), copied, TABLE, listings=False)
+    assert checked.problems == []
+    assert (checked.table_found, checked.table_rows) == (3, 3)
+    told = verify.check(
+        report(), note("") + "\nThe table lists two rows.", TABLE, listings=False
+    )
+    assert told.problems == ["tables: 0 of 3 source rows in the note"]
