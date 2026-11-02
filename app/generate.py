@@ -16,7 +16,7 @@ from collections.abc import Sequence
 from datetime import date
 from pathlib import Path
 
-from app import config, extract, listing, log, ollama
+from app import config, extract, listing, log, ollama, verify
 from app.chunk import Chunk, estimate_tokens
 from app.extract import Figure
 from app.language import ENGLISH, Language
@@ -371,6 +371,53 @@ def _parts_instruction(chunk: Chunk) -> str:
     ).strip()
 
 
+def _best_answer(
+    chunk: Chunk, prompt: str, source_text: str, model: str, domain: str
+) -> dict[str, str]:
+    """The model's sections, asked for again when the checks find them short.
+
+    At temperature 0.25 the same model on the same chunk copied all of
+    K&R's program output in one run and none of it in the next. The checks
+    of glosator verify run on every answer; one that fails them is asked
+    for again, up to GENERATE_RETRIES times, and the answer that lost the
+    fewest listing lines and table rows is kept.
+    """
+    best: dict[str, str] = {}
+    best_lost = -1
+    for attempt in range(1 + config.GENERATE_RETRIES):
+        sections = _answer(chunk, model, prompt, domain)
+        report = verify.Report(chunk, Path())
+        verify.check(
+            report,
+            "\n\n".join(sections.values()),
+            source_text,
+            listings=listing.wanted(domain),
+        )
+        lost = report.code_lines - report.code_found
+        lost += report.table_rows - report.table_found
+        if best_lost < 0 or lost < best_lost:
+            best, best_lost = sections, lost
+        if not report.problems:
+            break
+        log.event(
+            "generate",
+            "answer failed the checks",
+            section=chunk.section,
+            attempt=attempt + 1,
+            problems=report.problems,
+        )
+    return best
+
+
+def _answer(chunk: Chunk, model: str, prompt: str, domain: str) -> dict[str, str]:
+    raw = _complete(model, prompt, domain)
+    sections = split_sections(normalise_math(strip_wrapping(raw)))
+    missing = missing_sections(sections)
+    if missing:
+        raise ValueError(f"{chunk.section}: model omitted {', '.join(missing)}")
+    return sections
+
+
 def _complete(model: str, prompt: str, domain: str) -> str:
     """The model's answer, with room for verbatim listings where they belong."""
     if listing.wanted(domain):
@@ -408,11 +455,7 @@ def run(
         )
     prompt = note_prompt(chunk, source_text, book_title, domain, language)
 
-    raw = _complete(model, prompt, domain)
-    sections = split_sections(normalise_math(strip_wrapping(raw)))
-    missing = missing_sections(sections)
-    if missing:
-        raise ValueError(f"{chunk.section}: model omitted {', '.join(missing)}")
+    sections = _best_answer(chunk, prompt, source_text, model, domain)
 
     chunk_figures = figures_for(
         figures if figures is not None else extract.load_figures(book_slug), chunk

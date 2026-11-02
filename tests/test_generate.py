@@ -579,3 +579,52 @@ def test_a_merged_note_lists_its_sections_under_the_title(chunk: Chunk) -> None:
         "# 2.3.1 Emitter follower\n\n*Sekcje: 2.3.1 Emitter follower · 2.3.2 Bias*"
         in note
     )
+
+
+def test_run_asks_again_when_an_answer_drops_a_listing(
+    chunk: Chunk, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    chunk.text_path.write_text(
+        "## 2.3.1 Counting\n\n```\nint n = 0;\nn++;\n```\n", encoding="utf-8"
+    )
+    code = "\n## Code\n\n```c\nint n = 0;\nn++;\n```\nCounts.\n"
+    answers = [MODEL_OUTPUT, MODEL_OUTPUT + code]
+
+    def fake_generate(_model, _prompt, **_kwargs):
+        return answers.pop(0)
+
+    monkeypatch.setattr(generate.ollama, "generate", fake_generate)
+    path = generate.run(
+        chunk,
+        book_slug="p1",
+        book_title="Book",
+        book_tag="p1",
+        chapter_title="Basics",
+        figures=[],
+        domain="programming",
+    )
+    assert answers == []
+    assert "int n = 0;" in path.read_text(encoding="utf-8")
+
+
+def test_run_keeps_the_better_answer_when_both_fail(
+    chunk: Chunk, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    chunk.text_path.write_text(
+        "```\nint a = 1;\nint b = 2;\nint c = 3;\n```\n", encoding="utf-8"
+    )
+    some = "\n## Code\n\n```c\nint a = 1;\n```\nOne line.\n"
+    answers = [MODEL_OUTPUT + some, MODEL_OUTPUT]
+    monkeypatch.setattr(
+        generate.ollama, "generate", lambda *_args, **_kwargs: answers.pop(0)
+    )
+    path = generate.run(
+        chunk,
+        book_slug="p1",
+        book_title="Book",
+        book_tag="p1",
+        chapter_title="Basics",
+        figures=[],
+        domain="programming",
+    )
+    assert "int a = 1;" in path.read_text(encoding="utf-8")

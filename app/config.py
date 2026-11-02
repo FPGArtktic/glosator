@@ -107,6 +107,9 @@ LANGUAGE_SAMPLE_CHARS: int = 200_000
 VERIFY_MIN_CODE_SHARE: float = 0.9
 VERIFY_MIN_WORD_SHARE: float = 0.1
 VERIFY_MIN_TABLE_SHARE: float = 0.9
+# An answer that fails those checks is asked for again this many times; the
+# one that lost the fewest listing lines and table rows is kept.
+GENERATE_RETRIES: int = 1
 # A quoted listing line this long is found inside a longer line of the note;
 # a shorter one ("}", "n++;") would be found anywhere.
 VERIFY_MIN_QUOTED_CHARS: int = 8

@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from app import chunk as chunk_module
-from app import config, generate
+from app import config
 from app.chunk import Chunk
 
 FENCE_RE = re.compile(r"^```[^\n]*\n(.*?)^```", re.MULTILINE | re.DOTALL)
@@ -138,6 +138,10 @@ def run(
     chapter: int | None = None,
 ) -> list[Report]:
     """Reports for every chunk of the plan, or of one chapter of it."""
+    # generate checks every answer with check(); importing it at the top
+    # would make the two modules import each other.
+    from app import generate
+
     chunks = chunk_module.load_plan(book_slug)
     titles = chunk_module.chapter_titles(chunks)
     reports = []
