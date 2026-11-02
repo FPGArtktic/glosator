@@ -154,6 +154,19 @@ REPEATED_FIGURE_SIZE_TOLERANCE_PT: float = 2.0
 # Pages rendered by the extraction preview in the UI.
 PREVIEW_PAGES: int = 3
 
+# Books whose code listings are rebuilt from the text layer and copied into
+# the notes. The domain is the one given to "glosator add --domain".
+LISTING_DOMAINS: frozenset[str] = frozenset({"programming"})
+# How far outside docling's box around a listing a character may sit and
+# still belong to it, in points: the box is drawn around ink, not glyph cells.
+LISTING_BOX_MARGIN_PT: float = 2.0
+# Two characters share a line when their middles are this close, as a share of
+# a character's height. Punctuation sits lower than letters, by less than this.
+LISTING_LINE_TOLERANCE: float = 0.5
+# A gap narrower than one character cell but wider than this share of one is
+# a word space. Comments in a proportional font have spaces that narrow.
+LISTING_WORD_GAP: float = 0.3
+
 # A bought ebook can carry a per-copy watermark: one hex digest in the footer
 # of every page, which docling merges into the text. A digest is taken for a
 # watermark only when it repeats on this many pages of a batch, so a hash a

@@ -25,6 +25,7 @@ from app import (
     generate,
     index,
     language,
+    listing,
     log,
     ollama,
     vision,
@@ -151,6 +152,7 @@ def _do_extract(conn: sqlite3.Connection, job: sqlite3.Row) -> None:
         params["last_page"],
         params.get("ocr_langs", config.OCR_LANGS),
         force=bool(params.get("force")),
+        listings=listing.wanted(_domain(book)),
     )
     db.job_progress(conn, job["id"], 1, 1)
     db.stage_finish(

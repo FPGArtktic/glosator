@@ -8,15 +8,20 @@ module answers the cheap questions that extraction and chunking both ask.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
 import pypdfium2 as pdfium
+import pypdfium2.raw as pdfium_c
 
 from app import config
 
 POINTS_PER_INCH = 72.0
+# Text turned further than this, in radians, is not part of a line of the
+# page: a watermark printed up the margin, for one.
+UPRIGHT_TOLERANCE_RAD = 0.01
 
 
 @dataclass(frozen=True)
@@ -26,6 +31,21 @@ class Bookmark:
     title: str
     level: int
     page: int
+
+
+@dataclass(frozen=True)
+class Glyph:
+    """One printed character and its cell, in points from the bottom left."""
+
+    text: str
+    left: float
+    bottom: float
+    right: float
+    top: float
+
+    @property
+    def middle(self) -> float:
+        return (self.bottom + self.top) / 2
 
 
 def page_count(pdf_path: Path) -> int:
@@ -81,6 +101,37 @@ def render_page(pdf_path: Path, page: int, dpi: int = config.FIGURE_DPI):
     with _document(pdf_path) as pdf:
         scale = dpi / POINTS_PER_INCH
         return pdf[page - 1].render(scale=scale).to_pil()
+
+
+def page_glyphs(pdf_path: Path, page: int) -> list[Glyph]:
+    """Every upright, visible character of a 1-indexed page.
+
+    The cell is pdfium's loose box, which spans the character's advance, so
+    in a monospaced font neighbouring cells touch and a space is one empty
+    cell. Spaces themselves are left out: pdfium invents them where it guesses
+    a word break, and the cells say more exactly where the gaps are.
+    """
+    with _document(pdf_path) as pdf:
+        textpage = pdf[page - 1].get_textpage()
+        try:
+            return [
+                glyph
+                for index in range(textpage.count_chars())
+                if (glyph := _glyph(textpage, index)) is not None
+            ]
+        finally:
+            textpage.close()
+
+
+def _glyph(textpage, index: int) -> Glyph | None:
+    text = textpage.get_text_range(index, 1)
+    if not text.strip():
+        return None
+    angle = pdfium_c.FPDFText_GetCharAngle(textpage.raw, index)
+    if min(angle, 2 * math.pi - angle) > UPRIGHT_TOLERANCE_RAD:
+        return None
+    left, bottom, right, top = textpage.get_charbox(index, loose=True)
+    return Glyph(text, left, bottom, right, top)
 
 
 def _page_texts(pdf: pdfium.PdfDocument, pages: Iterable[int]) -> Iterator[str]:

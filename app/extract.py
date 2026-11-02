@@ -28,7 +28,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from app import config, log, pdf
+from app import config, listing, log, pdf
 
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*\S)\s*$", re.MULTILINE)
 
@@ -206,13 +206,16 @@ def run(
     ocr_langs: str = config.OCR_LANGS,
     *,
     force: bool = False,
+    listings: bool = False,
 ) -> ExtractResult:
     """Extract a page range, batch by batch, each batch in a child process.
 
     A batch extracted earlier with the same settings is reused unless
     ``force``, so a stopped extraction of a long book resumes instead of
     starting over. The chapter files and ``figures.json`` are rewritten from
-    all batches at the end.
+    all batches at the end. ``listings`` rebuilds the code listings of a
+    programming book from the text layer, and turns formula recognition off,
+    which read code as mathematics.
     """
     book_dir = config.WORK_DIR / book_slug
     (book_dir / "figures").mkdir(parents=True, exist_ok=True)
@@ -222,7 +225,7 @@ def run(
     ocr_pages: list[int] = []
     heading = ""
     for start, end in batches(first_page, last_page):
-        wanted = _batch_settings(start, end, ocr_langs, len(figures), heading)
+        wanted = _batch_settings(start, end, ocr_langs, len(figures), heading, listings)
         record = None if force else _reusable_batch(book_dir, wanted)
         if record is None:
             record = _run_batch_child(book_slug, pdf_path, wanted)
@@ -252,7 +255,12 @@ def run(
 
 
 def _batch_settings(
-    first_page: int, last_page: int, ocr_langs: str, figure_offset: int, heading: str
+    first_page: int,
+    last_page: int,
+    ocr_langs: str,
+    figure_offset: int,
+    heading: str,
+    listings: bool = False,
 ) -> dict[str, object]:
     """Everything a batch's output depends on. A batch is reused only on a match.
 
@@ -264,7 +272,8 @@ def _batch_settings(
         "format": BATCH_FORMAT,
         "pages": [first_page, last_page],
         "ocr_langs": ocr_langs,
-        "formulas": config.DOCLING_FORMULAS,
+        "formulas": config.DOCLING_FORMULAS and not listings,
+        "listings": listings,
         "figure_offset": figure_offset,
         "heading": heading,
     }
@@ -458,8 +467,15 @@ def extract_batch(book_slug: str, pdf_path: Path, settings: dict[str, object]) -
     book_dir = config.WORK_DIR / book_slug
     ocr_pages = pages_needing_ocr(pdf_path, first_page, last_page)
     document, device = _convert_on_best_device(
-        pdf_path, first_page, last_page, str(settings["ocr_langs"]), bool(ocr_pages)
+        pdf_path,
+        first_page,
+        last_page,
+        str(settings["ocr_langs"]),
+        bool(ocr_pages),
+        formulas=bool(settings["formulas"]),
     )
+    if settings.get("listings"):
+        rebuild_listings(document, pdf_path)
     _write_pages(book_slug, document, first_page, last_page)
     figures, last_heading = _write_figures(
         book_dir,
@@ -534,7 +550,13 @@ def choose_device(setting: str = config.DOCLING_DEVICE) -> tuple[str, str]:
 
 
 def _convert_on_best_device(
-    pdf_path: Path, first_page: int, last_page: int, ocr_langs: str, do_ocr: bool
+    pdf_path: Path,
+    first_page: int,
+    last_page: int,
+    ocr_langs: str,
+    do_ocr: bool,
+    *,
+    formulas: bool = config.DOCLING_FORMULAS,
 ):
     """Convert on the card if it is free, on the CPU if it is not or if it fails.
 
@@ -547,7 +569,13 @@ def _convert_on_best_device(
     log.event("extract", "device chosen", device=device, reason=reason)
     try:
         return _convert(
-            pdf_path, first_page, last_page, ocr_langs, do_ocr, device
+            pdf_path,
+            first_page,
+            last_page,
+            ocr_langs,
+            do_ocr,
+            device,
+            formulas=formulas,
         ), device
     except Exception as error:
         if device == "cpu":
@@ -558,7 +586,42 @@ def _convert_on_best_device(
             pages=[first_page, last_page],
             error=repr(error),
         )
-    return _convert(pdf_path, first_page, last_page, ocr_langs, do_ocr, "cpu"), "cpu"
+    return _convert(
+        pdf_path, first_page, last_page, ocr_langs, do_ocr, "cpu", formulas=formulas
+    ), "cpu"
+
+
+def rebuild_listings(document, pdf_path: Path) -> int:
+    """Give each code block of ``document`` its lines and indentation back.
+
+    A block keeps docling's text when the text layer has nothing in its box,
+    as on a scanned page, and when it runs over more than one page. Returns
+    how many blocks were rebuilt.
+    """
+    from docling_core.types.doc.labels import DocItemLabel
+
+    glyphs: dict[int, list[pdf.Glyph]] = {}
+    rebuilt = 0
+    for item, _level in document.iterate_items():
+        if getattr(item, "label", None) != DocItemLabel.CODE or len(item.prov) != 1:
+            continue
+        page = item.prov[0].page_no
+        if page not in glyphs:
+            glyphs[page] = pdf.page_glyphs(pdf_path, page)
+        text = listing.layout(listing.inside(glyphs[page], _box(document, item)))
+        if text.strip():
+            item.text = text
+            rebuilt += 1
+    log.event("extract", "listings rebuilt", count=rebuilt)
+    return rebuilt
+
+
+def _box(document, item) -> tuple[float, float, float, float]:
+    """An item's box as (left, bottom, right, top) in points from the bottom left."""
+    provenance = item.prov[0]
+    height = document.pages[provenance.page_no].size.height
+    box = provenance.bbox.to_bottom_left_origin(height)
+    return (box.l, box.b, box.r, box.t)
 
 
 def _write_pages(book_slug: str, document, first_page: int, last_page: int) -> None:
@@ -661,6 +724,8 @@ def _convert(
     ocr_langs: str,
     do_ocr: bool,
     device: str,
+    *,
+    formulas: bool = config.DOCLING_FORMULAS,
 ):
     """The only place that talks to docling. Keep version churn contained here."""
     from docling.datamodel.accelerator_options import (
@@ -683,7 +748,7 @@ def _convert(
     )
     options.do_ocr = do_ocr
     options.do_table_structure = True
-    options.do_formula_enrichment = config.DOCLING_FORMULAS
+    options.do_formula_enrichment = formulas
     options.generate_picture_images = False
     if do_ocr:
         # force_full_page_ocr stays off: pages that do have a text layer keep

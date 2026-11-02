@@ -211,7 +211,7 @@ def test_auto_takes_the_card_only_when_it_is_free(free, device, monkeypatch) -> 
 def test_a_failed_gpu_conversion_is_redone_on_the_cpu(monkeypatch) -> None:
     devices: list[str] = []
 
-    def convert(_pdf, _first, _last, _langs, _ocr, device):
+    def convert(_pdf, _first, _last, _langs, _ocr, device, **_options):
         devices.append(device)
         if device == "cuda":
             raise extract.ExtractionIncomplete("Stage layout failed")
@@ -228,7 +228,7 @@ def test_a_failed_gpu_conversion_is_redone_on_the_cpu(monkeypatch) -> None:
 
 
 def test_a_failed_cpu_conversion_is_not_hidden(monkeypatch) -> None:
-    def convert(*_args):
+    def convert(*_args, **_options):
         raise extract.ExtractionIncomplete("page failed")
 
     monkeypatch.setattr(extract, "choose_device", lambda: ("cpu", "no card"))
@@ -430,6 +430,7 @@ def _sighting(image: int, page: int, height: float = 70.0) -> extract.Sighting:
 
 
 def test_page_markdown_keeps_code_characters_as_printed() -> None:
+    pytest.importorskip("docling_core")
     from docling_core.types.doc.document import DoclingDocument
     from docling_core.types.doc.labels import DocItemLabel
 

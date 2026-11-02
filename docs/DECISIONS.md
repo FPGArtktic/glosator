@@ -637,3 +637,38 @@ is there because a real figure failed without it, on the console book:
   as its listing (40, 41, 61 pt).
 
 On the three books this drops exactly the logos and the reprinted covers.
+
+## 2026-11-02 — A programming book's listings go into its notes, verbatim
+
+A pilot on four Polish C and C++ textbooks found no code in the notes at
+all, and code that should not have been there in the wrong place:
+
+- docling's markdown joins each code block into one line. The line breaks
+  and the indentation are gone, a preprocessor directive runs into the
+  next one, and after the first `//` comment the rest of the program reads
+  as part of the comment. The PDFs' text layer still has every character
+  in its place.
+- formula recognition read short code fragments in the text as displayed
+  mathematics and wrote them as LaTeX: a loop condition `x <= 300` came out
+  as `x \leftarrow 300`, which the note then listed under Formulas.
+- the note prompt had nowhere to put a listing, so the model described the
+  programs in prose and left every one of them out.
+
+For a book added with `--domain programming` (`config.LISTING_DOMAINS`):
+
+- extraction rebuilds each single-page code block from the text layer
+  (`app/listing.py`): the characters inside docling's box are grouped into
+  lines by height and laid out in columns by their pdfium cells, which in a
+  monospaced font are exactly one column wide. A block whose box holds no
+  text, as on a scanned page, keeps docling's text.
+- formula recognition is off. The row "formulas as LaTeX" in the table in
+  `CLAUDE.md` holds for every other book.
+- the note gets a `Code` section in place of `Formulas`, after
+  `Explanation`, with the listings copied character for character in fenced
+  blocks, each followed by one line saying what it shows. Notes of other
+  books do not change.
+
+A listing split by a page break arrives as two blocks with the page's
+footer between them; the prompt asks the model to join them. The listings
+in the notes are the book's own text, and only for the reader's own study:
+see the copyright section of the README.
