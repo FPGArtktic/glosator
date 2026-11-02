@@ -332,3 +332,49 @@ should.
 Still weak: worked numbers, tables and practical warnings are left out, and
 digital-logic glossary terms are calqued ("suma produktów" for sum of
 products).
+
+## Measured on 2026-11-02 — RTX 5070 Ti, four Polish C and C++ textbooks
+
+Samples of 8–16 pages from each of four Polish programming books (an ANSI C
+classic, a C++ reference, a C course and a book on pointers), `gemma4:31b`,
+`--domain programming`. No text from the books is reproduced here.
+
+**Before** (the pipeline of 2026-11-01): every code block reached the model
+as one line, so a `//` comment swallowed the rest of its program and
+preprocessor directives ran together; `&&` arrived as `&amp;&amp;`,
+identifiers with underscores as `a\_b`, and a per-copy watermark digest sat
+in the middle of sentences. Formula recognition turned code fragments into
+LaTeX with a changed meaning (`<=` became an arrow). The note on the C
+classic's first sixteen pages showed none of its nine programs and listed
+four fake formulas.
+
+**After** (listings rebuilt from the text layer, a `Code` section):
+
+| Book | Pages | Notes | Listings in notes | Listing faults |
+|---|---|---|---|---|
+| ANSI C classic | 16 | 2 | 20 | 2 shifted six columns (prose line in docling's box; fixed since) |
+| pointers | 13 | 1 | 23 | 0 |
+| C course | 8 | 1 | 9 | 0 |
+| C++ reference | 10 | 2 | 23 | 0 after the word-space fixes |
+
+Listings split by a page break were joined by the model in every case seen,
+program output went into separate `text` blocks, and no listing was
+corrected, completed or invented. Two errors that are in the Polish editions
+themselves (an assignment where a comparison is meant, a legal `sizeof`
+marked illegal) were copied as printed, which is what the prompt asks.
+
+Rebuilding the listings on the C++ sample first lost word spaces in the
+comments, which are set in a proportional italic: gaps of 0.9–2.1 pt
+against a 4.26 pt cell, and one of 0.22 pt where an italic "j" tucks under
+the letter before it. A threshold of 0.15 cell plus the text layer's own
+space characters restore all of them. That book also sets `->` with a
+minus sign, U+2212, now written as ASCII.
+
+The ten-page C++ chunk (about 5,600 tokens, half of it code) ran past
+`num_predict` 3072. With the programming budget (2–4k-token chunks,
+`num_predict` 6144, `num_ctx` 16384) it became two chunks, written in 4.9
+and 2.3 minutes, with the model still on the card.
+
+Unanswered exercises (the C classic gives no answers) were each filled with
+"Answer: (no answer provided in source)"; the prompt now keeps them as bare
+tasks.
