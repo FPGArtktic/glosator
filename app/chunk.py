@@ -238,7 +238,9 @@ def outline_chapter(bookmarks: Sequence[Bookmark], page: int) -> int | None:
     A book whose outline names only its chapters ("Chapter 2 - Basic Analog
     Circuit Analysis") cannot drive chunking, but it still says which chapter
     a page is in, and a note without a chapter lands outside every chapter
-    folder.
+    folder. A top-level bookmark that is not a chapter ends the chapter
+    before it: an appendix or the index after the last chapter is not part
+    of it.
     """
     chapter = None
     for mark in sorted(bookmarks, key=lambda mark: mark.page):
@@ -247,6 +249,8 @@ def outline_chapter(bookmarks: Sequence[Bookmark], page: int) -> int | None:
         number = extract.chapter_number(mark.title)
         if number is not None:
             chapter = number
+        elif mark.level == 0:
+            chapter = None
     return chapter
 
 
@@ -302,6 +306,10 @@ def spans_from_bookmarks(
 ) -> list[Span]:
     """Page range per bookmark, in document order.
 
+    Each span knows the chapter the outline puts it in, for a book whose
+    sections are not numbered: under "Rozdział 1. Wstęp", "Wskaźniki i
+    pamięć" belongs to chapter 1, which its own title cannot say.
+
     A bookmark that has children keeps only the pages before its first child;
     the rest belongs to the children. ``selected`` filters by bookmark title,
     which is what the UI's TOC checkboxes produce.
@@ -317,7 +325,8 @@ def spans_from_bookmarks(
             None,
         )
         page_end = page_count if following is None else max(following - 1, mark.page)
-        spans.append(Span(mark.title, mark.level, mark.page, page_end))
+        chapter = outline_chapter(bookmarks, mark.page)
+        spans.append(Span(mark.title, mark.level, mark.page, page_end, chapter))
 
     if selected is None:
         return spans
@@ -388,7 +397,7 @@ def section_spans(
     """
     wanted = {title.strip() for title in selected} if selected else None
     return [
-        Span(title, 0, start, end)
+        Span(title, 0, start, end, outline_chapter(bookmarks, start))
         for title, first_page, last_page in section_ranges(bookmarks, page_count)
         if wanted is None or title.strip() in wanted
         for start, end in balanced_split(

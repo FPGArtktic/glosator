@@ -52,7 +52,7 @@ def test_spans_from_bookmarks_fills_page_ranges() -> None:
 def test_spans_from_bookmarks_never_ends_before_it_starts() -> None:
     bookmarks = [Bookmark("2 A", 0, 71), Bookmark("2.1 B", 1, 71)]
     spans = chunk_module.spans_from_bookmarks(bookmarks, page_count=80)
-    assert spans[0] == Span("2 A", 0, 71, 71)
+    assert spans[0] == Span("2 A", 0, 71, 71, outline_chapter=2)
 
 
 def test_spans_from_bookmarks_filters_by_selection() -> None:
@@ -721,3 +721,26 @@ def test_a_programming_book_is_cut_into_smaller_chunks() -> None:
     prose = chunk_module.note_budget()
     assert listings.max_tokens < prose.max_tokens
     assert listings.manifest == prose.manifest
+
+
+def test_an_unnumbered_section_takes_the_chapter_it_stands_under() -> None:
+    bookmarks = [
+        Bookmark("Preface", 0, 9),
+        Bookmark("Why this book", 1, 9),
+        Bookmark("Chapter 1. Introduction", 0, 15),
+        Bookmark("Memory and addresses", 1, 16),
+        Bookmark("Chapter 2. Allocation", 0, 51),
+        Bookmark("Freeing memory", 1, 52),
+    ]
+    spans = chunk_module.spans_from_bookmarks(bookmarks, page_count=60)
+    assert [span.chapter for span in spans] == [None, None, 1, 1, 2, 2]
+
+
+def test_an_appendix_after_the_last_chapter_is_not_part_of_it() -> None:
+    bookmarks = [
+        Bookmark("Chapter 8. Odds and ends", 0, 200),
+        Bookmark("Appendix A. Answers", 0, 230),
+        Bookmark("Index", 0, 250),
+    ]
+    assert chunk_module.outline_chapter(bookmarks, 210) == 8
+    assert chunk_module.outline_chapter(bookmarks, 235) is None
