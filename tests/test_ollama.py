@@ -110,3 +110,13 @@ def test_generate_rejects_a_response_cut_off_at_the_limit(
     monkeypatch.setattr(ollama, "client", lambda: fake)
     with pytest.raises(ollama.OllamaUnavailable, match="length limit"):
         ollama.generate("gemma4:31b", "prompt")
+
+
+def test_generate_takes_a_wider_window_when_asked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = FakeClient(response="a note")
+    monkeypatch.setattr(ollama, "client", lambda: fake)
+    ollama.generate("gemma3", "prompt", num_ctx=16384, num_predict=6144)
+    assert fake.calls[0]["options"]["num_ctx"] == 16384
+    assert fake.calls[0]["options"]["num_predict"] == 6144

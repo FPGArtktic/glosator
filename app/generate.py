@@ -360,6 +360,18 @@ def note_prompt(
     )
 
 
+def _complete(model: str, prompt: str, domain: str) -> str:
+    """The model's answer, with room for verbatim listings where they belong."""
+    if listing.wanted(domain):
+        return ollama.generate(
+            model,
+            prompt,
+            num_ctx=config.LISTING_NUM_CTX,
+            num_predict=config.LISTING_NUM_PREDICT,
+        )
+    return ollama.generate(model, prompt)
+
+
 def run(
     chunk: Chunk,
     *,
@@ -385,7 +397,7 @@ def run(
         )
     prompt = note_prompt(chunk, source_text, book_title, domain, language)
 
-    raw = ollama.generate(model, prompt)
+    raw = _complete(model, prompt, domain)
     sections = split_sections(normalise_math(strip_wrapping(raw)))
     missing = missing_sections(sections)
     if missing:

@@ -531,3 +531,30 @@ def test_an_exercise_without_an_answer_is_kept_as_a_bare_task() -> None:
     prompt = generate.load_prompt("note.md")
     assert "with no Answer line" in prompt
     assert "never say that the answer is missing" in prompt
+
+
+def test_a_programming_book_gets_room_for_its_listings(
+    chunk: Chunk, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[dict] = []
+
+    def fake_generate(_model, _prompt, **options):
+        calls.append(options)
+        return MODEL_OUTPUT
+
+    monkeypatch.setattr(generate.ollama, "generate", fake_generate)
+    for domain in ("programming", "electronics"):
+        generate.run(
+            chunk,
+            book_slug="bk1",
+            book_title="Book",
+            book_tag="bk1",
+            chapter_title="Transistors",
+            figures=[],
+            domain=domain,
+        )
+    assert calls[0] == {
+        "num_ctx": config.LISTING_NUM_CTX,
+        "num_predict": config.LISTING_NUM_PREDICT,
+    }
+    assert calls[1] == {}

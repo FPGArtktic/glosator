@@ -57,6 +57,15 @@ CHUNK_MAX_TOKENS: int = 6000
 # bare contents, not a section, and is left out of the plan.
 CHUNK_SKIP_TOKENS: int = 150
 
+# A programming book's note copies its listings verbatim, so the answer grows
+# with the source: a ten-page C++ chunk ran past NUM_PREDICT on the pilot.
+# Its chunks are smaller, which keeps a note close to one section, and its
+# answer has twice the room, with the window widened to hold it.
+LISTING_CHUNK_MIN_TOKENS: int = 2000
+LISTING_CHUNK_MAX_TOKENS: int = 4000
+LISTING_NUM_PREDICT: int = 6144
+LISTING_NUM_CTX: int = 16384
+
 # The same budget for the export stage, which writes files for a model that
 # is not this machine's. Nothing has to fit in 4 GB of VRAM there, so the
 # files are longer: fewer of them to hand over, and more of a chapter in

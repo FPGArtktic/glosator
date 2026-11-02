@@ -672,3 +672,18 @@ A listing split by a page break arrives as two blocks with the page's
 footer between them; the prompt asks the model to join them. The listings
 in the notes are the book's own text, and only for the reader's own study:
 see the copyright section of the README.
+
+## 2026-11-02 — A programming book's notes get smaller chunks and more room
+
+With the listings copied verbatim, a note grows with its source. The pilot
+chunk of ten C++ pages (about 5,600 tokens, half of it code) ran past
+`num_predict` 3072 and failed. For a book of a listing domain:
+
+- chunks are 2,000–4,000 tokens instead of 3,000–6,000, which also keeps a
+  note closer to one section of a book whose outline is fine-grained;
+- the answer may take 6,144 tokens, and `num_ctx` is 16,384 to hold it with
+  a full chunk and the prompt. The settings in `CLAUDE.md` stay for every
+  other book.
+
+The wider window costs some KV cache; gemma4's sliding-window layers keep
+that small, and the pilot run checks it on the card.

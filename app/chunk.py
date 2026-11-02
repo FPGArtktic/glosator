@@ -58,8 +58,19 @@ class Budget:
     manifest: str
 
 
-def note_budget() -> Budget:
-    """Chunks sized for the local model: one chunk is one note."""
+def note_budget(listings: bool = False) -> Budget:
+    """Chunks sized for the local model: one chunk is one note.
+
+    A book whose notes copy its listings gets smaller ones (see
+    ``config.LISTING_CHUNK_MAX_TOKENS``).
+    """
+    if listings:
+        return Budget(
+            config.LISTING_CHUNK_MIN_TOKENS,
+            config.LISTING_CHUNK_MAX_TOKENS,
+            "chunks",
+            CHUNKS_JSON,
+        )
     return Budget(
         config.CHUNK_MIN_TOKENS, config.CHUNK_MAX_TOKENS, "chunks", CHUNKS_JSON
     )

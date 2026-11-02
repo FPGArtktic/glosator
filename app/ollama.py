@@ -47,7 +47,14 @@ def unload(model: str) -> None:
         log.event("ollama", "could not unload model", model=model, error=repr(error))
 
 
-def generate(model: str, prompt: str, images: list[Path] | None = None) -> str:
+def generate(
+    model: str,
+    prompt: str,
+    images: list[Path] | None = None,
+    *,
+    num_ctx: int | None = None,
+    num_predict: int | None = None,
+) -> str:
     """One completion. Blocks for as long as ``OLLAMA_TIMEOUT_S`` allows.
 
     Thinking is turned off explicitly, because gemma4 thinks unless told not
@@ -55,7 +62,9 @@ def generate(model: str, prompt: str, images: list[Path] | None = None) -> str:
     what that costs on this card: 735 s for one window with thinking against
     134 s without, and no fewer errors; gemma4:12b at the pipeline's
     temperature looped until the budget was gone and returned nothing.
-    Models without thinking accept the field and ignore it.
+    Models without thinking accept the field and ignore it. ``num_ctx`` and
+    ``num_predict`` default to the configured ones; a programming book's notes
+    ask for more (``config.LISTING_NUM_PREDICT``).
     """
     try:
         response = client().generate(
@@ -65,9 +74,9 @@ def generate(model: str, prompt: str, images: list[Path] | None = None) -> str:
             think=False,
             keep_alive=config.OLLAMA_KEEP_ALIVE,
             options={
-                "num_ctx": config.NUM_CTX,
+                "num_ctx": num_ctx or config.NUM_CTX,
                 "temperature": config.TEMPERATURE,
-                "num_predict": config.NUM_PREDICT,
+                "num_predict": num_predict or config.NUM_PREDICT,
             },
         )
     except Exception as error:

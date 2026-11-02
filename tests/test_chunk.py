@@ -714,3 +714,10 @@ def test_plan_of_a_deep_outline_names_every_part_after_its_section(
     assert ("101.2", "Boot the system") in titles
     # The title page and the topic page hold no section and make no note.
     assert all("Learning Materials" not in title for _section, title in titles)
+
+
+def test_a_programming_book_is_cut_into_smaller_chunks() -> None:
+    listings = chunk_module.note_budget(listings=True)
+    prose = chunk_module.note_budget()
+    assert listings.max_tokens < prose.max_tokens
+    assert listings.manifest == prose.manifest

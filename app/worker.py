@@ -170,6 +170,7 @@ def _do_chunk(conn: sqlite3.Connection, job: sqlite3.Row) -> None:
         Path(book["pdf_path"]),
         selected=params.get("sections"),
         page_ranges=ranges or None,
+        budget=chunk_module.note_budget(listing.wanted(_domain(book))),
     )
     db.replace_chunks(conn, job["book_id"], chunks)
     db.job_progress(conn, job["id"], len(chunks), len(chunks))
