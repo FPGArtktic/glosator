@@ -48,6 +48,10 @@ APPARATUS_TITLES = frozenset(
         "index",
         "stronatytułowa",
         "stronaredakcyjna",
+        "bibliografia",
+        "bibliography",
+        "references",
+        "odwołanialiteraturowe",
     }
 )
 # A heading this short ("## 4") begins too many titles to stand for one.
