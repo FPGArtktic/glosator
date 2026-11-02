@@ -439,3 +439,30 @@ def test_page_markdown_keeps_code_characters_as_printed() -> None:
     )
     markdown = extract.page_markdown(document)
     assert "left_index < n && *cursor" in markdown
+
+
+MARK = "0123456789abcdef0123456789abcdef"
+
+
+def test_a_digest_on_every_page_is_dropped_wherever_it_landed() -> None:
+    pages = [
+        f"First sentence. {MARK} Second sentence.",
+        f"{MARK} Opening words.",
+        f"Closing words.\n\n{MARK}",
+    ]
+    assert extract.drop_watermarks(pages) == [
+        "First sentence. Second sentence.",
+        "Opening words.",
+        "Closing words.\n\n",
+    ]
+
+
+def test_a_digest_printed_once_stays() -> None:
+    pages = [f"The checksum is {MARK}.", "Other text.", "More text."]
+    assert extract.drop_watermarks(pages) == pages
+
+
+def test_dropping_a_watermark_keeps_code_indentation() -> None:
+    listing = "```\nint main(void)\n{\n    return 0;\n}\n```"
+    pages = [f"{listing}\n{MARK}", MARK, MARK]
+    assert extract.drop_watermarks(pages)[0] == f"{listing}\n"

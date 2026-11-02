@@ -22,6 +22,7 @@ import signal
 import subprocess
 import sys
 import unicodedata
+from collections import Counter
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -40,6 +41,8 @@ FIGURES_JSON = "figures.json"
 TABLE_ROW_RE = re.compile(r"^\|.*\|[ \t]*$", re.MULTILINE)
 TABLE_PADDING_RE = re.compile(r"[ \t]{2,}")
 TABLE_RULE_RE = re.compile(r"-{4,}")
+# The shape of a per-copy watermark: an MD5-sized lowercase hex digest.
+WATERMARK_RE = re.compile(r"\b[0-9a-f]{32}\b")
 PAGES_DIR = "pages"
 BATCHES_DIR = "batches"
 # Bumped when what a batch writes changes, so older batches are not reused.
@@ -559,9 +562,35 @@ def _convert_on_best_device(
 
 
 def _write_pages(book_slug: str, document, first_page: int, last_page: int) -> None:
-    for page in range(first_page, last_page + 1):
-        markdown = compact_tables(page_markdown(document, page))
+    numbers = range(first_page, last_page + 1)
+    pages = [compact_tables(page_markdown(document, page)) for page in numbers]
+    for page, markdown in zip(numbers, drop_watermarks(pages), strict=True):
         _write_text(page_markdown_path(book_slug, page), markdown.strip() + "\n")
+
+
+def drop_watermarks(pages: list[str]) -> list[str]:
+    """Remove a hex digest that repeats on several pages, wherever it landed.
+
+    docling reads the footer digest into the nearest paragraph, so it ends up
+    in the middle of a sentence or ahead of one, and from there in the notes.
+    """
+    counts = Counter(
+        token for page in pages for token in set(WATERMARK_RE.findall(page))
+    )
+    needed = max(2, min(config.WATERMARK_MIN_PAGES, len(pages)))
+    marks = sorted(token for token, count in counts.items() if count >= needed)
+    if not marks:
+        return pages
+    pattern = re.compile(r"[ \t]*\b(?:" + "|".join(marks) + r")\b[ \t]*")
+    return [pattern.sub(_watermark_gap, page) for page in pages]
+
+
+def _watermark_gap(match: re.Match[str]) -> str:
+    """One space between two words, nothing at the edge of a line."""
+    text = match.string
+    at_line_start = match.start() == 0 or text[match.start() - 1] == "\n"
+    at_line_end = match.end() == len(text) or text[match.end()] == "\n"
+    return "" if at_line_start or at_line_end else " "
 
 
 def page_markdown(document, page: int | None = None) -> str:

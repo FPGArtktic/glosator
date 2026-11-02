@@ -154,6 +154,12 @@ REPEATED_FIGURE_SIZE_TOLERANCE_PT: float = 2.0
 # Pages rendered by the extraction preview in the UI.
 PREVIEW_PAGES: int = 3
 
+# A bought ebook can carry a per-copy watermark: one hex digest in the footer
+# of every page, which docling merges into the text. A digest is taken for a
+# watermark only when it repeats on this many pages of a batch, so a hash a
+# book prints as an example, once, stays.
+WATERMARK_MIN_PAGES: int = 3
+
 # How often the worker re-reads the job queue when it is empty.
 WORKER_POLL_S: float = 2.0
 
