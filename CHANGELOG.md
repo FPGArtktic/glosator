@@ -5,6 +5,14 @@ Notable changes to glosator, newest first. Versions follow
 The reasons behind the larger decisions are in
 [docs/DECISIONS.md](docs/DECISIONS.md).
 
+## [0.6.10] — 2026-11-03
+
+### Fixed
+- `verify` flags a 32-character digest as a watermark only when the source
+  does not print it. A checksum in a Yocto recipe is the book's own text.
+- `verify` reads an escaped ruling (`&#124;`) that OCR left in a table cell
+  as a space, so the row matches the note's.
+
 ## [0.6.9] — 2026-11-03
 
 ### Fixed
@@ -184,6 +192,7 @@ The first release: from a PDF to study notes in an Obsidian vault.
   completed or corrected.
 - A watermark digest the shop prints on every page is dropped.
 
+[0.6.10]: https://github.com/FPGArtktic/glosator/compare/v0.6.9...v0.6.10
 [0.6.9]: https://github.com/FPGArtktic/glosator/compare/v0.6.8...v0.6.9
 [0.6.8]: https://github.com/FPGArtktic/glosator/compare/v0.6.7...v0.6.8
 [0.6.7]: https://github.com/FPGArtktic/glosator/compare/v0.6.6...v0.6.7
