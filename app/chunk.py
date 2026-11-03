@@ -88,6 +88,7 @@ DIGITS_RE = re.compile(r"\d+")
 # A heading this short ("## 4") begins too many titles to stand for one.
 TITLE_PREFIX_MIN_CHARS = 6
 CONTINUED = " (continued)"
+FENCE = "```"
 # balanced_split raises its trial ceiling by a twentieth at a time.
 BALANCE_STEP_DIVISOR = 20
 CHUNKS_JSON = "chunks.json"
@@ -865,18 +866,35 @@ def _bookmark_pages(
         for page in range(span.page_start, last_page + 1)
     }
     start = title_offset(pages[span.page_start], span.title)
+    reopened = ""
     if start is not None:
-        pages[span.page_start] = pages[span.page_start][start:]
+        page = pages[span.page_start]
+        reopened = FENCE + "\n" if inside_fence(page[:start]) else ""
+        pages[span.page_start] = reopened + page[start:]
     if following is None:
         return pages
     # On a shared page the search starts below the span's own title.
-    after = 1 if last_page == span.page_start and start is not None else 0
+    shared = last_page == span.page_start and start is not None
+    after = len(reopened) + 1 if shared else 0
     end = title_offset(pages[last_page], following.title, after)
     if end is not None:
-        pages[last_page] = pages[last_page][:end].rstrip()
+        kept = pages[last_page][:end].rstrip()
+        pages[last_page] = kept + "\n" + FENCE if inside_fence(kept) else kept
     elif last_page > span.page_end:
         del pages[last_page]
     return pages
+
+
+def inside_fence(text: str) -> bool:
+    """True when ``text`` ends inside a fenced code block.
+
+    The listings rebuilt from the text layer can take a heading and the
+    sentence under it into the block around them. Cut at that heading, a
+    section would start with the block's closing fence, and every block
+    after it would read inside out.
+    """
+    fences = sum(line.lstrip().startswith(FENCE) for line in text.splitlines())
+    return fences % 2 == 1
 
 
 def title_offset(text: str, title: str, start: int = 0) -> int | None:

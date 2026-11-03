@@ -899,6 +899,27 @@ def test_plan_names_a_chunk_as_its_page_spells_it(
     assert [item.title for item in chunks] == ["Stałe"]
 
 
+def test_a_section_cut_inside_a_code_block_keeps_its_fences_paired(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    page = (
+        "1 Alpha\nWe declare it:\n```\nint a;\n2 Beta\nThen we use it:\n"
+        "a = 1;\n```\nThat is all.\n3 Gamma\nThe end."
+    )
+    monkeypatch.setattr(pdf, "page_count", lambda _path: 1)
+    monkeypatch.setattr(pdf, "page_text", lambda _p, _f, _l: page)
+    marks = [Bookmark(title, 0, 1) for title in ("1 Alpha", "2 Beta", "3 Gamma")]
+    spans = chunk_module.spans_from_bookmarks(marks, 1)
+    parts = chunk_module.bookmark_parts(
+        Path("/nonexistent/book.pdf"), marks, spans, chunk_module.note_budget(), "bk1"
+    )
+    texts = [text for _span, text in parts]
+    assert texts[0].endswith("int a;\n```")
+    assert texts[1].startswith("```\n2 Beta")
+    assert texts[2] == "3 Gamma\nThe end."
+    assert all(text.count("```") % 2 == 0 for text in texts)
+
+
 def test_a_trusted_outline_names_its_chunk_despite_a_numbered_line() -> None:
     span = Span("Glossary", 0, 320, 330)
     text = "Glossary\n\n19.1 Explain the difference between two orders\n"
