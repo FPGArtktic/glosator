@@ -5,6 +5,13 @@ Notable changes to glosator, newest first. Versions follow
 The reasons behind the larger decisions are in
 [docs/DECISIONS.md](docs/DECISIONS.md).
 
+## [0.6.7] — 2026-11-03
+
+### Fixed
+- A bookmark whose title differs from its page's heading by a space between
+  two letters ("Stał e" for "Stałe") takes the page's spelling, so the
+  note's title and file name are spelled right.
+
 ## [0.6.6] — 2026-11-03
 
 ### Fixed
@@ -163,6 +170,7 @@ The first release: from a PDF to study notes in an Obsidian vault.
   completed or corrected.
 - A watermark digest the shop prints on every page is dropped.
 
+[0.6.7]: https://github.com/FPGArtktic/glosator/compare/v0.6.6...v0.6.7
 [0.6.6]: https://github.com/FPGArtktic/glosator/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/FPGArtktic/glosator/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/FPGArtktic/glosator/compare/v0.6.3...v0.6.4
