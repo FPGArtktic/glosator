@@ -154,6 +154,13 @@ def test_a_table_row_matches_with_its_mathematics_as_latex() -> None:
     assert (checked.table_found, checked.table_rows) == (3, 3)
 
 
+def test_a_ruling_read_into_a_cell_does_not_hide_the_row() -> None:
+    source = "| Pin | Mode |\n|---|---|\n| 0 | &#124;Serial flash |\n"
+    text = note("") + "\n| Pin | Mode |\n|---|---|\n| 0 | Serial flash |\n"
+    checked = verify.check(report(), text, source, listings=False)
+    assert (checked.table_found, checked.table_rows) == (2, 2)
+
+
 def test_a_row_under_a_spanned_cell_matches_the_row_that_repeats_it() -> None:
     source = (
         "| Space | Request | Purpose |\n|---|---|---|\n"

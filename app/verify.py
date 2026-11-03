@@ -11,6 +11,7 @@ that it cannot cover its pages.
 
 from __future__ import annotations
 
+import html
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -212,6 +213,9 @@ def _cell(cell: str) -> str:
     """A table cell as the book would print it, spacing squeezed."""
     # The model sets code in a cell between backticks; the book does not.
     cell = cell.replace("`", "").replace("$", "")
+    # OCR of a table drawn as a picture keeps a ruling as "&#124;", an
+    # escaped "|", which the model rightly leaves out.
+    cell = html.unescape(cell).replace("|", " ")
     cell = LATEX_SYMBOL_RE.sub(lambda match: LATEX_SYMBOLS[match.group()], cell)
     return _squeeze(cell)
 
