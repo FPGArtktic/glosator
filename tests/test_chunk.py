@@ -930,6 +930,40 @@ def test_a_section_cut_inside_a_code_block_keeps_its_fences_paired(
     assert all(text.count("```") % 2 == 0 for text in texts)
 
 
+def test_sections_of_a_deep_outline_sharing_a_page_are_cut_at_their_titles(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pages = {
+        1: "1.1 Setup\nInstall the tools.\n1.2 Build\nRun make.",
+        2: "Wait for it.\n1.3 Flash\nWrite the card.",
+    }
+    monkeypatch.setattr(pdf, "page_count", lambda _path: 2)
+    monkeypatch.setattr(
+        pdf,
+        "page_text",
+        lambda _p, first, last: "\n\n".join(
+            pages[page] for page in range(first, last + 1)
+        ),
+    )
+    marks = [
+        Bookmark("1.1 Setup", 1, 1),
+        Bookmark("Prerequisites", 2, 1),
+        Bookmark("1.2 Build", 1, 1),
+        Bookmark("1.3 Flash", 1, 2),
+    ]
+    path = Path("/nonexistent/book.pdf")
+    assert chunk_module.is_deep_outline(marks)
+    spans = chunk_module.section_spans(
+        path, marks, 2, chunk_module.note_budget(), "bk1"
+    )
+    texts = chunk_module.section_texts(path, marks, spans, 2, "bk1")
+    assert texts == [
+        "1.1 Setup\nInstall the tools.",
+        "1.2 Build\nRun make.\n\nWait for it.",
+        "1.3 Flash\nWrite the card.",
+    ]
+
+
 def test_a_trusted_outline_names_its_chunk_despite_a_numbered_line() -> None:
     span = Span("Glossary", 0, 320, 330)
     text = "Glossary\n\n19.1 Explain the difference between two orders\n"

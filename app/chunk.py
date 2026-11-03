@@ -604,6 +604,41 @@ def section_spans(
     ]
 
 
+def section_texts(
+    pdf_path: Path,
+    bookmarks: Sequence[Bookmark],
+    spans: Sequence[Span],
+    page_count: int,
+    book_slug: str,
+) -> list[str]:
+    """The text of each span of a deep outline, cut at the section titles.
+
+    Sections of a lab book share their pages: four of them start on one
+    page. Read as whole pages, each took the page, and a chunk of the four
+    read it four times, the end of the section before included. The first
+    part of a section starts at its title, the last ends at the next one's,
+    as bookmark_parts cuts a shallow outline.
+    """
+    ranges = section_ranges(bookmarks, page_count)
+    following = {
+        title: Bookmark(next_title, 0, next_page)
+        for (title, _, _), (next_title, next_page, _) in itertools.pairwise(ranges)
+    }
+    texts = []
+    for index, span in enumerate(spans):
+        first = index == 0 or spans[index - 1].title != span.title
+        last = index + 1 == len(spans) or spans[index + 1].title != span.title
+        pages = _bookmark_pages(
+            pdf_path,
+            span,
+            following.get(span.title) if last else None,
+            book_slug,
+            from_title=first,
+        )
+        texts.append(PAGE_SEPARATOR.join(text for text in pages.values() if text))
+    return texts
+
+
 def balanced_split(
     pdf_path: Path, first_page: int, last_page: int, sizes: Budget, book_slug: str
 ) -> list[tuple[int, int]]:
@@ -850,13 +885,19 @@ def _following(bookmarks: Sequence[Bookmark], span: Span) -> Bookmark | None:
 
 
 def _bookmark_pages(
-    pdf_path: Path, span: Span, following: Bookmark | None, book_slug: str
+    pdf_path: Path,
+    span: Span,
+    following: Bookmark | None,
+    book_slug: str,
+    *,
+    from_title: bool = True,
 ) -> dict[int, str]:
     """The pages of a span, trimmed to its title and the next bookmark's.
 
     The page the next bookmark starts on is read too, for the end of this
     section above its title. Where that title is not found, the page is left
-    to the next section, as the span's page range says.
+    to the next section, as the span's page range says. A later part of a
+    section cut by pages starts where its pages do (``from_title`` off).
     """
     last_page = span.page_end
     if following is not None and following.page > last_page:
@@ -865,7 +906,7 @@ def _bookmark_pages(
         page: readable_text(pdf_path, page, page, book_slug)
         for page in range(span.page_start, last_page + 1)
     }
-    start = title_offset(pages[span.page_start], span.title)
+    start = title_offset(pages[span.page_start], span.title) if from_title else None
     reopened = ""
     if start is not None:
         page = pages[span.page_start]
@@ -1035,11 +1076,13 @@ def plan(
     if not spans:
         raise ValueError("no bookmarks selected and no page ranges given")
 
-    if page_ranges or by_section:
+    if page_ranges:
         texts = [
             readable_text(pdf_path, span.page_start, span.page_end, book_slug)
             for span in spans
         ]
+    elif by_section:
+        texts = section_texts(pdf_path, bookmarks, spans, page_total, book_slug)
     else:
         parts = bookmark_parts(pdf_path, bookmarks, spans, sizes, book_slug)
         spans = [span for span, _text in parts]
