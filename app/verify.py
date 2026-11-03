@@ -160,8 +160,13 @@ def _check_tables(report: Report, note: str, source: str) -> None:
     """Every row of the source's tables should be a row of the note's."""
     wanted = _table_rows(source)
     have = _table_rows(note)
+    code_words = {
+        word.casefold() for line in _code_lines(note) for word in WORD_RE.findall(line)
+    }
     report.table_rows = len(wanted)
-    report.table_found = sum(_row_found(row, have) for row in wanted)
+    report.table_found = sum(
+        _row_found(row, have) or _row_in_code(row, code_words) for row in wanted
+    )
     if wanted and report.table_found < config.VERIFY_MIN_TABLE_SHARE * len(wanted):
         report.problems.append(
             f"tables: {report.table_found} of {len(wanted)} source rows in the note"
@@ -185,6 +190,13 @@ def _row_found(row: str, have: Sequence[str]) -> bool:
     if len(cells) == len(every) and len(cells) > 1:
         return False
     return any(_in_order(cells, other.split("|")) for other in have)
+
+
+def _row_in_code(row: str, code_words: set[str]) -> bool:
+    """A row of a listing that docling laid out as a table, set as code."""
+    words = [word.casefold() for word in WORD_RE.findall(row)]
+    named = [word for word in words if not word.isdigit()]
+    return len(named) >= config.VERIFY_CODE_ROW_MIN_WORDS and set(words) <= code_words
 
 
 def _in_order(cells: list[str], other: list[str]) -> bool:

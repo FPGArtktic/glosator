@@ -161,6 +161,19 @@ def test_a_ruling_read_into_a_cell_does_not_hide_the_row() -> None:
     assert (checked.table_found, checked.table_rows) == (2, 2)
 
 
+def test_a_listing_laid_out_as_a_table_is_found_in_the_code() -> None:
+    source = (
+        "| struct | device *dev; |\n|---|---|\n"
+        "| { struct card | *card = dev_get_drvdata(dev); |\n"
+        "| 0 | 1 |\n"
+    )
+    code = "struct device *dev;\n{\n    struct card *card = dev_get_drvdata(dev);\n"
+    checked = verify.check(
+        report(), note(code + "    return 0 + 1;"), source, listings=False
+    )
+    assert (checked.table_found, checked.table_rows) == (2, 3)
+
+
 def test_a_row_closed_with_an_empty_column_still_matches() -> None:
     source = "| | Pros | Cons |\n|---|---|---|\n| Manual | flexible | slow |\n"
     text = note("") + (

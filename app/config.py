@@ -117,6 +117,11 @@ GENERATE_RETRIES: int = 1
 # A quoted listing line this long is found inside a longer line of the note;
 # a shorter one ("}", "n++;") would be found anywhere.
 VERIFY_MIN_QUOTED_CHARS: int = 8
+# A source table row with at least this many words that are not numbers is
+# found when every word of it is in the note's code: docling lays out a
+# listing as a table ("struct|device *dev;"), and the note rightly sets it as
+# code. A truth table's rows, digits only, still have to match whole.
+VERIFY_CODE_ROW_MIN_WORDS: int = 2
 # An EPUB has no pages; extraction cuts one about this long, at the end of a
 # paragraph, so that chunking can read it like a PDF. A printed page of the
 # Helion books measured holds 2,500 to 3,000 characters.
