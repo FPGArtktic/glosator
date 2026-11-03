@@ -5,6 +5,21 @@ Notable changes to glosator, newest first. Versions follow
 The reasons behind the larger decisions are in
 [docs/DECISIONS.md](docs/DECISIONS.md).
 
+## [0.7.0] — 2026-11-03
+
+### Changed
+- A chunk under 150 tokens joins the chunk before it in its chapter. Only
+  one with nothing to join and under 50 tokens (a part's divider, a title
+  page) is left out; before, everything under 150 was, a chapter's
+  summary and a training's last lab with it.
+
+### Fixed
+- The sections of a deep outline are cut at their titles. Sections that
+  share a page each read the whole page, so a chunk of several sections
+  held it several times: 38-58% of a lab book's text were repeats.
+- A section title is found on a page that prints it without the number
+  glosator gave it, or with a number of its own ("0.13 Memory split").
+
 ## [0.6.11] — 2026-11-03
 
 ### Fixed
@@ -198,6 +213,7 @@ The first release: from a PDF to study notes in an Obsidian vault.
   completed or corrected.
 - A watermark digest the shop prints on every page is dropped.
 
+[0.7.0]: https://github.com/FPGArtktic/glosator/compare/v0.6.11...v0.7.0
 [0.6.11]: https://github.com/FPGArtktic/glosator/compare/v0.6.10...v0.6.11
 [0.6.10]: https://github.com/FPGArtktic/glosator/compare/v0.6.9...v0.6.10
 [0.6.9]: https://github.com/FPGArtktic/glosator/compare/v0.6.8...v0.6.9
