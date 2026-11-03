@@ -204,7 +204,11 @@ def _table_rows(text: str) -> list[str]:
         if not line.startswith("|") or TABLE_RULE_RE.match(line):
             continue
         cells = [_cell(cell) for cell in line.strip("|").split("|")]
-        if any(cells):
+        # The model may close a row with an empty column the book does not
+        # have; an empty first cell stays, it is a header's corner.
+        while cells and not cells[-1]:
+            cells.pop()
+        if cells:
             rows.append("|".join(cells))
     return rows
 
