@@ -391,6 +391,16 @@ def test_title_offset_accepts_a_chapter_title_cut_in_two() -> None:
     assert chunk_module.title_offset(page, "Chapter 5. Loops and branches") == 0
 
 
+def test_title_offset_finds_a_title_numbered_its_own_way_on_the_page() -> None:
+    page = "## 0.12 Interrupts\n\ntop half\n\n## 0.13 Memory split\n\nbody\n"
+    offset = chunk_module.title_offset(page, "13 Memory split")
+    assert page[offset:].startswith("## 0.13 Memory split")
+    page = "Board setup steps.\n\nMore guidelines\n\nRead the manual first.\n"
+    offset = chunk_module.title_offset(page, "1.4 More guidelines")
+    assert page[offset:].startswith("More guidelines")
+    assert chunk_module.title_offset(page, "1.5 Kernel sources") is None
+
+
 def test_title_offset_prefers_a_whole_heading_to_a_prefix() -> None:
     page = "## Pointers\n\nintro\n\n## Pointers and arrays\n\nbody\n"
     offset = chunk_module.title_offset(page, "Pointers and arrays")

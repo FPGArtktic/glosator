@@ -906,11 +906,17 @@ def title_offset(text: str, title: str, start: int = 0) -> int | None:
     that does (a page read from the text layer has no headings), then a
     heading that begins the title: docling may cut "Rozdział 5. OPERATORY"
     into "## Rozdział 5." and "## OPERATORY".
+
+    Last, a line that matches with both numbers left out: number_outline
+    numbers a bookmark the page prints bare ("More guidelines") or numbered
+    its own way ("0.13 MemoryManagement"). Missed, the section kept the
+    whole page, and a chunk of several sections read it once for each.
     """
     wanted = _letters(title)
     if not wanted:
         return None
-    plain = prefix = None
+    bare = _letters(section_title(title))
+    plain = prefix = renumbered = None
     for match in LINE_RE.finditer(text, start):
         line = match.group(0).lstrip()
         is_heading = line.startswith("#")
@@ -928,7 +934,17 @@ def title_offset(text: str, title: str, start: int = 0) -> int | None:
             and wanted.startswith(found)
         ):
             prefix = match.start()
-    return plain if plain is not None else prefix
+        if renumbered is None and _bare_line(line) == bare:
+            renumbered = match.start()
+    for offset in (plain, prefix, renumbered):
+        if offset is not None:
+            return offset
+    return None
+
+
+def _bare_line(line: str) -> str:
+    """A line's letters and digits without the section number it opens with."""
+    return _letters(section_title(line.lstrip("#").strip()))
 
 
 def spelled_as_printed(title: str, text: str) -> str:
