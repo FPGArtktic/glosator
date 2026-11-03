@@ -131,3 +131,29 @@ def test_a_table_row_matches_with_its_code_in_backticks() -> None:
     text = note("") + "\n| `char *strcpy(s,ct)` | copies `ct` to `s` |\n|---|---|\n"
     checked = verify.check(report(), text, source, listings=False)
     assert (checked.table_found, checked.table_rows) == (1, 1)
+
+
+def test_a_table_row_matches_with_its_mathematics_as_latex() -> None:
+    source = "| plus infinity | 0 | ∞ |\n|---|---|---|\n| range | 10^{-38} | ≠ 0 |\n"
+    text = note("") + (
+        "\n| plus infinity | 0 | $\\infty$ |\n|---|---|---|\n"
+        "| range | $10^{-38}$ | $\\neq 0$ |\n"
+    )
+    checked = verify.check(report(), text, source, listings=False)
+    assert (checked.table_found, checked.table_rows) == (2, 2)
+
+
+def test_a_row_under_a_spanned_cell_matches_the_row_that_repeats_it() -> None:
+    source = (
+        "| Space | Request | Purpose |\n|---|---|---|\n"
+        "| Memory | read | moves data |\n| write |\n"
+        "| 0 | 1 | 1 |\n"
+    )
+    text = note("") + (
+        "\n| Space | Request | Purpose |\n|---|---|---|\n"
+        "| Memory | read | moves data |\n| Memory | write | moves data |\n"
+        "| 0 | 1 | 1 | 0 |\n"
+    )
+    checked = verify.check(report(), text, source, listings=False)
+    # The truth-table row is as long as the note's and must match whole.
+    assert (checked.table_found, checked.table_rows) == (3, 4)

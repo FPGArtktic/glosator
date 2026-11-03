@@ -28,6 +28,33 @@ EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 WORD_RE = re.compile(r"\w+")
 INLINE_CODE_RE = re.compile(r"`([^`\n]+)`")
 TABLE_RULE_RE = re.compile(r"^\|[\s:|-]+\|$")
+# The model sets a cell's mathematics as LaTeX; the book prints it as text.
+# A cell is compared without its dollars and with these commands as the
+# characters they stand for.
+LATEX_SYMBOLS = {
+    "\\infty": "∞",
+    "\\neq": "≠",
+    "\\ne": "≠",
+    "\\leq": "≤",
+    "\\le": "≤",
+    "\\geq": "≥",
+    "\\ge": "≥",
+    "\\times": "\u00d7",
+    "\\cdot": "·",
+    "\\pm": "±",
+    "\\oplus": "⊕",
+    "\\ldots": "…",
+    "\\dots": "…",
+    "\\cap": "∩",
+    "\\cup": "\u222a",
+    "\\rightarrow": "→",
+    "\\to": "→",
+}
+LATEX_SYMBOL_RE = re.compile(
+    "(?:"
+    + "|".join(re.escape(name) for name in sorted(LATEX_SYMBOLS, key=len, reverse=True))
+    + r")(?![A-Za-z])"
+)
 
 
 @dataclass
@@ -114,13 +141,41 @@ def _found(line: str, have: set[str]) -> bool:
 def _check_tables(report: Report, note: str, source: str) -> None:
     """Every row of the source's tables should be a row of the note's."""
     wanted = _table_rows(source)
-    have = set(_table_rows(note))
+    have = _table_rows(note)
     report.table_rows = len(wanted)
-    report.table_found = sum(row in have for row in wanted)
+    report.table_found = sum(_row_found(row, have) for row in wanted)
     if wanted and report.table_found < config.VERIFY_MIN_TABLE_SHARE * len(wanted):
         report.problems.append(
             f"tables: {report.table_found} of {len(wanted)} source rows in the note"
         )
+
+
+def _row_found(row: str, have: Sequence[str]) -> bool:
+    """A source row is a row of the note, or part of a longer one.
+
+    A cell the book spans over several rows is printed in the first of
+    them only, and the rows under it hold the rest of their cells; the
+    model repeats the spanned cell in each. Such a partial row, one with
+    empty cells or a single one, is found when its cells stand in that
+    order in a note row with more of them. A full row must match whole:
+    a truth table's "0|1" is in order in every longer row of digits.
+    """
+    if row in have:
+        return True
+    every = row.split("|")
+    cells = [cell for cell in every if cell]
+    if len(cells) == len(every) and len(cells) > 1:
+        return False
+    return any(_in_order(cells, other.split("|")) for other in have)
+
+
+def _in_order(cells: list[str], other: list[str]) -> bool:
+    """The cells are among the other row's, in order, and are fewer."""
+    filled = [cell for cell in other if cell]
+    if len(cells) >= len(filled):
+        return False
+    remaining = iter(filled)
+    return all(cell in remaining for cell in cells)
 
 
 def _table_rows(text: str) -> list[str]:
@@ -130,11 +185,18 @@ def _table_rows(text: str) -> list[str]:
         line = line.strip()
         if not line.startswith("|") or TABLE_RULE_RE.match(line):
             continue
-        # The model sets code in a cell between backticks; the book does not.
-        cells = [_squeeze(cell.replace("`", "")) for cell in line.strip("|").split("|")]
+        cells = [_cell(cell) for cell in line.strip("|").split("|")]
         if any(cells):
             rows.append("|".join(cells))
     return rows
+
+
+def _cell(cell: str) -> str:
+    """A table cell as the book would print it, spacing squeezed."""
+    # The model sets code in a cell between backticks; the book does not.
+    cell = cell.replace("`", "").replace("$", "")
+    cell = LATEX_SYMBOL_RE.sub(lambda match: LATEX_SYMBOLS[match.group()], cell)
+    return _squeeze(cell)
 
 
 def _code_lines(text: str) -> list[str]:
