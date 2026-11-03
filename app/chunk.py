@@ -835,7 +835,30 @@ def group_spans(
 
     if current:
         groups.append(current)
-    return groups
+    return _fold_small(groups, dict(zip(spans, token_counts, strict=True)))
+
+
+def _fold_small(groups: list[list[Span]], tokens: dict[Span, int]) -> list[list[Span]]:
+    """A group too small for a note joins the one before it in its chapter.
+
+    A chapter's last section, a list of exercises under its own title, came
+    out at a hundred tokens on its own and _drop_empty left it out with its
+    tasks. Joined, it is part of the chapter's last note; a note over the
+    budget by less than CHUNK_FOLD_TOKENS still fits the context.
+    """
+    folded: list[list[Span]] = []
+    for group in groups:
+        size = sum(tokens[span] for span in group)
+        previous = folded[-1] if folded else None
+        if (
+            size < config.CHUNK_FOLD_TOKENS
+            and previous is not None
+            and previous[0].chapter == group[0].chapter
+        ):
+            previous.extend(group)
+            continue
+        folded.append(list(group))
+    return folded
 
 
 def bookmark_parts(

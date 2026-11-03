@@ -90,6 +90,37 @@ def test_group_spans_keeps_an_oversized_section_whole() -> None:
     assert [[span.section for span in group] for group in groups] == [["2.1"], ["2.2"]]
 
 
+def test_a_tiny_last_section_joins_the_note_before_it_in_its_chapter() -> None:
+    spans = [_span("8.4", 1), _span("8.5", 2), _span("9.1", 2)]
+    tiny = config.CHUNK_FOLD_TOKENS // 2
+    groups = chunk_module.group_spans(
+        spans, [config.CHUNK_MAX_TOKENS, tiny, config.CHUNK_MIN_TOKENS]
+    )
+    assert [[span.section for span in group] for group in groups] == [
+        ["8.4", "8.5"],
+        ["9.1"],
+    ]
+
+
+def test_a_short_last_chapter_keeps_its_note(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    lab = "5 Lab 4\nMeasure page faults with ftrace and pre-fault the stack.\n"
+    monkeypatch.setattr(pdf, "page_count", lambda _path: 2)
+    monkeypatch.setattr(
+        pdf,
+        "read_toc",
+        lambda _path: [Bookmark("1 Setup", 0, 1), Bookmark("5 Lab 4", 0, 2)],
+    )
+    monkeypatch.setattr(
+        pdf,
+        "page_text",
+        lambda _p, first, _l: "1 Setup\n" + "x " * 900 if first == 1 else lab * 4,
+    )
+    chunks = chunk_module.plan("bk1", Path("/nonexistent/book.pdf"))
+    assert [item.title for item in chunks] == ["Setup", "Lab 4"]
+
+
 def test_group_spans_flushes_at_the_minimum() -> None:
     spans = [_span("2.1", 1), _span("2.2", 2)]
     groups = chunk_module.group_spans(

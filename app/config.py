@@ -53,9 +53,13 @@ OLLAMA_KEEP_ALIVE: str = "30m"
 # section is never split, even when it exceeds MAX.
 CHUNK_MIN_TOKENS: int = 3000
 CHUNK_MAX_TOKENS: int = 6000
-# A chunk of a deep outline with less source than this is a title page or a
-# bare contents, not a section, and is left out of the plan.
-CHUNK_SKIP_TOKENS: int = 150
+# A chunk with less source than this joins the one before it in its chapter:
+# a chapter's summary or a one-slide section is part of the last note.
+CHUNK_FOLD_TOKENS: int = 150
+# A chunk with less source than this that had nothing to join is a title page
+# or a part's divider, not a section, and is left out of the plan. A short
+# last lab of a training (130 tokens) is above it.
+CHUNK_SKIP_TOKENS: int = 50
 
 # A programming book's note copies its listings verbatim, so the answer grows
 # with the source: a ten-page C++ chunk ran past NUM_PREDICT on the pilot.
