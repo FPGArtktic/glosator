@@ -90,7 +90,9 @@ class Report:
 def check(report: Report, note: str, source: str, *, listings: bool) -> Report:
     """Run the checks on one written note into its report."""
     report.written = True
-    if DIGEST_RE.search(note):
+    # Extraction drops the shop's watermark, so a digest still in the source
+    # is the book's own: a checksum in a recipe or a build log.
+    if set(DIGEST_RE.findall(note)) - set(DIGEST_RE.findall(source)):
         report.problems.append("a watermark digest is in the note")
     stray = set(EMAIL_RE.findall(note)) - set(EMAIL_RE.findall(source))
     if stray:

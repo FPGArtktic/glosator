@@ -75,6 +75,13 @@ def test_a_binary_number_is_not_a_watermark() -> None:
     assert verify.check(report(), text, SOURCE, listings=True).problems == []
 
 
+def test_a_checksum_the_source_prints_is_not_a_watermark() -> None:
+    line = 'CHKSUM = "file://LICENSE;md5=0a1b2c3d4e5f60718293a4b5c6d7e8f9"'
+    source = f"A recipe names its licence:\n\n```\n{line}\n```\n"
+    text = note(line)
+    assert verify.check(report(), text, source, listings=True).problems == []
+
+
 def test_a_note_far_shorter_than_its_source_is_a_problem() -> None:
     source = "word " * 3000
     problems = verify.check(report(), note("", words=50), source, listings=False)
