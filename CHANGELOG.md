@@ -5,6 +5,13 @@ Notable changes to glosator, newest first. Versions follow
 The reasons behind the larger decisions are in
 [docs/DECISIONS.md](docs/DECISIONS.md).
 
+## [0.6.8] — 2026-11-03
+
+### Fixed
+- A publisher's front and back matter bookmarked page by page (cover,
+  title page, copyright, dedication, contributors, "About Packt", "Other
+  Books You May Enjoy") is left out of the plan. The preface stays.
+
 ## [0.6.7] — 2026-11-03
 
 ### Fixed
@@ -170,6 +177,7 @@ The first release: from a PDF to study notes in an Obsidian vault.
   completed or corrected.
 - A watermark digest the shop prints on every page is dropped.
 
+[0.6.8]: https://github.com/FPGArtktic/glosator/compare/v0.6.7...v0.6.8
 [0.6.7]: https://github.com/FPGArtktic/glosator/compare/v0.6.6...v0.6.7
 [0.6.6]: https://github.com/FPGArtktic/glosator/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/FPGArtktic/glosator/compare/v0.6.4...v0.6.5
