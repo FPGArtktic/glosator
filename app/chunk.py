@@ -65,6 +65,15 @@ APPARATUS_TITLES = frozenset(
         "lastslides",
         "aboutthisdocument",
         "copyingthisdocument",
+        # A publisher's front and back matter, each its own bookmark: the
+        # pages before the preface, and the advertisements after the index.
+        "cover",
+        "titlepage",
+        "copyrightandcredits",
+        "dedication",
+        "contributors",
+        "aboutpackt",
+        "otherbooksyoumayenjoy",
     }
 )
 # Apparatus that names itself at greater length: "Bibliografia w porządku

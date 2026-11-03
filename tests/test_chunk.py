@@ -869,6 +869,14 @@ def test_a_bibliography_section_is_left_out() -> None:
     assert not chunk_module.is_apparatus("7.7 References and pointers")
 
 
+def test_a_publishers_front_and_back_matter_is_left_out() -> None:
+    for title in ("Cover", "Title Page", "Copyright and Credits", "Dedication"):
+        assert chunk_module.is_apparatus(title)
+    assert chunk_module.is_apparatus("Other Books You May Enjoy")
+    assert not chunk_module.is_apparatus("Preface")
+    assert not chunk_module.is_apparatus("3.4 Cover letters and title pages")
+
+
 def test_a_bookmark_takes_the_spelling_of_its_page() -> None:
     page = "## 2.4.3. Obsługa błędów\n\nObsługa błędów to temat obszerny."
     assert chunk_module.spelled_as_printed("2.4.3. Obsł uga bł ędów", page) == (
