@@ -5,6 +5,13 @@ Notable changes to glosator, newest first. Versions follow
 The reasons behind the larger decisions are in
 [docs/DECISIONS.md](docs/DECISIONS.md).
 
+## [0.7.1] — 2026-11-03
+
+### Fixed
+- A slide template's title bar (a logo and the slide's title) is not a
+  figure. An uncaptioned picture with the same left edge, top and bottom
+  on five pages or more is left out.
+
 ## [0.7.0] — 2026-11-03
 
 ### Changed
@@ -213,6 +220,7 @@ The first release: from a PDF to study notes in an Obsidian vault.
   completed or corrected.
 - A watermark digest the shop prints on every page is dropped.
 
+[0.7.1]: https://github.com/FPGArtktic/glosator/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/FPGArtktic/glosator/compare/v0.6.11...v0.7.0
 [0.6.11]: https://github.com/FPGArtktic/glosator/compare/v0.6.10...v0.6.11
 [0.6.10]: https://github.com/FPGArtktic/glosator/compare/v0.6.9...v0.6.10
