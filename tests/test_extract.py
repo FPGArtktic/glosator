@@ -410,6 +410,31 @@ def _sighting(image: int, page: int, height: float = 70.0) -> extract.Sighting:
     return extract.Sighting(image, page, 197.0, height)
 
 
+def test_a_title_bar_of_every_slide_is_left_out() -> None:
+    # A slide template prints its logo and the slide's title at the top left,
+    # as wide as each title; a diagram sits wherever its slide puts it.
+    bars = [
+        _crop(f"bar-{page}", page, (17.0, 463.5, 160.0 + page, 415.0))
+        for page in range(3, 9)
+    ]
+    diagram = _crop("diagram", 5, (17.0, 380.0, 700.0, 120.0))
+    captioned = _crop("captioned", 6, (17.0, 463.5, 200.0, 415.0), "Fig. 2")
+    kept = extract.drop_bands([*bars, diagram, captioned])
+    assert [figure.id for figure in kept] == ["diagram", "captioned"]
+    assert extract.drop_bands(bars[:4]) == bars[:4]
+
+
+def _crop(
+    figure_id: str,
+    page: int,
+    bbox: tuple[float, float, float, float],
+    caption: str = "",
+) -> extract.Figure:
+    return extract.Figure(
+        figure_id, page, bbox, caption, "", f"figures/{figure_id}.png"
+    )
+
+
 def test_page_markdown_keeps_code_characters_as_printed() -> None:
     pytest.importorskip("docling_core")
     from docling_core.types.doc.document import DoclingDocument

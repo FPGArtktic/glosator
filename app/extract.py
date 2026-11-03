@@ -23,6 +23,7 @@ import subprocess
 import sys
 import unicodedata
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -821,10 +822,53 @@ def _crop(pdf_path: Path, page: int, bbox, out_path: Path) -> None:
 
 
 def load_figures(book_slug: str) -> list[Figure]:
+    """The book's figures, the template's bands left out.
+
+    The bands are left out here rather than at extraction, so that a book
+    extracted before the rule needs no second pass on the card.
+    """
     path = config.WORK_DIR / book_slug / FIGURES_JSON
     if not path.exists():
         return []
-    return [_figure(record) for record in json.loads(path.read_text(encoding="utf-8"))]
+    figures = [
+        _figure(record) for record in json.loads(path.read_text(encoding="utf-8"))
+    ]
+    return drop_bands(figures)
+
+
+def drop_bands(figures: Sequence[Figure]) -> list[Figure]:
+    """The figures without the bands every page of a template prints.
+
+    The repeated-picture check compares the crops, and a slide's title bar
+    is a different crop on every slide: its title changes and its width with
+    it. Its place does not, so the left edge, top and bottom decide here.
+    """
+    groups: list[tuple[Figure, list[str], set[int]]] = []
+    for figure in figures:
+        if figure.caption:
+            continue
+        for first, members, pages in groups:
+            if _same_band(first, figure):
+                members.append(figure.id)
+                pages.add(figure.page)
+                break
+        else:
+            groups.append((figure, [figure.id], {figure.page}))
+    bands = {
+        figure_id
+        for _first, members, pages in groups
+        if len(pages) >= config.FIGURE_BAND_MIN_PAGES
+        for figure_id in members
+    }
+    return [figure for figure in figures if figure.id not in bands]
+
+
+def _same_band(one: Figure, other: Figure) -> bool:
+    """Same left edge, top and bottom, within the repeated-figure tolerance."""
+    tolerance = config.REPEATED_FIGURE_SIZE_TOLERANCE_PT
+    return all(
+        abs(one.bbox[index] - other.bbox[index]) <= tolerance for index in (0, 1, 3)
+    )
 
 
 def main(argv: list[str] | None = None) -> int:

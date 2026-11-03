@@ -179,6 +179,11 @@ REPEATED_FIGURE_MIN_SPAN_PAGES: int = 20
 REPEATED_FIGURE_MAX_BITS: int = 4
 # ... and the same size, within this many points each way.
 REPEATED_FIGURE_SIZE_TOLERANCE_PT: float = 2.0
+# An uncaptioned picture with the same left edge, top and bottom on this many
+# pages is a band of the page's template, whatever it shows: Bootlin's title
+# bar, the logo and the slide's title, came back on 71 of a deck's 128
+# pictures, as wide as each title.
+FIGURE_BAND_MIN_PAGES: int = 5
 
 # Pages rendered by the extraction preview in the UI.
 PREVIEW_PAGES: int = 3
