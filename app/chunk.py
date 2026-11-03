@@ -70,6 +70,9 @@ APPARATUS_TITLES = frozenset(
 # Apparatus that names itself at greater length: "Bibliografia w porządku
 # alfabetycznym" closes Tanenbaum's last chapter, a section of it.
 APPARATUS_PREFIXES = ("bibliografia", "bibliography")
+# A space between two letters of a bookmark that the page may not have:
+# Helion's outline reads "2.2.3. Stał e" for the heading "2.2.3. Stałe".
+OUTLINE_SPACE_RE = re.compile(r"(?<=\w) (?=\w)")
 # A line of the page's furniture, compared with every digit the same: the
 # footer "Bootlin - https://bootlin.com 20/334" is one line on every page.
 DIGITS_RE = re.compile(r"\d+")
@@ -901,6 +904,32 @@ def title_offset(text: str, title: str, start: int = 0) -> int | None:
     return plain if plain is not None else prefix
 
 
+def spelled_as_printed(title: str, text: str) -> str:
+    """A bookmark's title as its page prints it, where a space sets them apart.
+
+    Only spaces between two letters are in question, and only the whole
+    title found on the page decides; the title keeps its own letter case.
+    """
+    spaces = list(OUTLINE_SPACE_RE.finditer(title))
+    if not spaces:
+        return title
+    pattern, start = [], 0
+    for space in spaces:
+        pattern.append(re.escape(title[start : space.start()]))
+        pattern.append("( ?)")
+        start = space.end()
+    pattern.append(re.escape(title[start:]))
+    found = re.search("".join(pattern), " ".join(text.split()), re.IGNORECASE)
+    if found is None:
+        return title
+    kept, start = [], 0
+    for index, space in enumerate(spaces, start=1):
+        kept.append(title[start : space.start()] + found.group(index))
+        start = space.end()
+    kept.append(title[start:])
+    return "".join(kept)
+
+
 def _letters(text: str) -> str:
     return NON_LETTERS_RE.sub("", text).casefold()
 
@@ -972,6 +1001,10 @@ def plan(
         parts = bookmark_parts(pdf_path, bookmarks, spans, sizes, book_slug)
         spans = [span for span, _text in parts]
         texts = [text for _span, text in parts]
+    spans = [
+        replace(span, title=spelled_as_printed(span.title, text))
+        for span, text in zip(spans, texts, strict=True)
+    ]
     # Page ranges are boundaries the operator drew: they are never merged
     # across, and split_to_budget has already cut them to a readable size.
     if page_ranges:

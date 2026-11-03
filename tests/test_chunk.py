@@ -869,6 +869,28 @@ def test_a_bibliography_section_is_left_out() -> None:
     assert not chunk_module.is_apparatus("7.7 References and pointers")
 
 
+def test_a_bookmark_takes_the_spelling_of_its_page() -> None:
+    page = "## 2.4.3. Obsługa błędów\n\nObsługa błędów to temat obszerny."
+    assert chunk_module.spelled_as_printed("2.4.3. Obsł uga bł ędów", page) == (
+        "2.4.3. Obsługa błędów"
+    )
+    assert chunk_module.spelled_as_printed("Stał e", "## STAŁE\n") == "Stałe"
+    assert chunk_module.spelled_as_printed(
+        "Rozdział 1. Uwagi", "Rozdział 1. Uwagi"
+    ) == ("Rozdział 1. Uwagi")
+    assert chunk_module.spelled_as_printed("Stał e", "nothing like it") == "Stał e"
+
+
+def test_plan_names_a_chunk_as_its_page_spells_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(pdf, "page_count", lambda _path: 10)
+    monkeypatch.setattr(pdf, "read_toc", lambda _path: [Bookmark("1 Stał e", 0, 1)])
+    monkeypatch.setattr(pdf, "page_text", lambda _p, first, _l: "1 Stałe\n" + "x" * 400)
+    chunks = chunk_module.plan("bk1", Path("/nonexistent/book.pdf"))
+    assert [item.title for item in chunks] == ["Stałe"]
+
+
 def test_a_trusted_outline_names_its_chunk_despite_a_numbered_line() -> None:
     span = Span("Glossary", 0, 320, 330)
     text = "Glossary\n\n19.1 Explain the difference between two orders\n"
