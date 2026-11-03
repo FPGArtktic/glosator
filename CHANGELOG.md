@@ -5,6 +5,13 @@ Notable changes to glosator, newest first. Versions follow
 The reasons behind the larger decisions are in
 [docs/DECISIONS.md](docs/DECISIONS.md).
 
+## [0.6.9] — 2026-11-03
+
+### Fixed
+- A section cut at a title inside a listing keeps its code fences paired.
+  The listing is reopened at the start of the part and closed at its end,
+  so code and prose no longer swap places for the model and for `verify`.
+
 ## [0.6.8] — 2026-11-03
 
 ### Fixed
@@ -177,6 +184,7 @@ The first release: from a PDF to study notes in an Obsidian vault.
   completed or corrected.
 - A watermark digest the shop prints on every page is dropped.
 
+[0.6.9]: https://github.com/FPGArtktic/glosator/compare/v0.6.8...v0.6.9
 [0.6.8]: https://github.com/FPGArtktic/glosator/compare/v0.6.7...v0.6.8
 [0.6.7]: https://github.com/FPGArtktic/glosator/compare/v0.6.6...v0.6.7
 [0.6.6]: https://github.com/FPGArtktic/glosator/compare/v0.6.5...v0.6.6
