@@ -5,6 +5,13 @@ Notable changes to glosator, newest first. Versions follow
 The reasons behind the larger decisions are in
 [docs/DECISIONS.md](docs/DECISIONS.md).
 
+## [0.7.2] — 2026-11-03
+
+### Fixed
+- `verify` finds a listing that docling laid out as a table in the note's
+  code: a row counts when every word of it is in the code and at least
+  two of them are not numbers.
+
 ## [0.7.1] — 2026-11-03
 
 ### Fixed
@@ -220,6 +227,7 @@ The first release: from a PDF to study notes in an Obsidian vault.
   completed or corrected.
 - A watermark digest the shop prints on every page is dropped.
 
+[0.7.2]: https://github.com/FPGArtktic/glosator/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/FPGArtktic/glosator/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/FPGArtktic/glosator/compare/v0.6.11...v0.7.0
 [0.6.11]: https://github.com/FPGArtktic/glosator/compare/v0.6.10...v0.6.11
