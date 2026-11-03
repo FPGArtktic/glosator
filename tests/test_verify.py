@@ -134,13 +134,17 @@ def test_a_table_row_matches_with_its_code_in_backticks() -> None:
 
 
 def test_a_table_row_matches_with_its_mathematics_as_latex() -> None:
-    source = "| plus infinity | 0 | ∞ |\n|---|---|---|\n| range | 10^{-38} | ≠ 0 |\n"
+    source = (
+        "| plus infinity | 0 | ∞ |\n|---|---|---|\n| range | 10^{-38} | ≠ 0 |\n"
+        "| 3 | OP A, B, C | A ← B OP C |\n"
+    )
     text = note("") + (
         "\n| plus infinity | 0 | $\\infty$ |\n|---|---|---|\n"
         "| range | $10^{-38}$ | $\\neq 0$ |\n"
+        "| 3 | OP A, B, C | $A \\leftarrow B$ OP C |\n"
     )
     checked = verify.check(report(), text, source, listings=False)
-    assert (checked.table_found, checked.table_rows) == (2, 2)
+    assert (checked.table_found, checked.table_rows) == (3, 3)
 
 
 def test_a_row_under_a_spanned_cell_matches_the_row_that_repeats_it() -> None:
