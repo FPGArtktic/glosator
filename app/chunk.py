@@ -67,6 +67,9 @@ APPARATUS_TITLES = frozenset(
         "copyingthisdocument",
     }
 )
+# Apparatus that names itself at greater length: "Bibliografia w porządku
+# alfabetycznym" closes Tanenbaum's last chapter, a section of it.
+APPARATUS_PREFIXES = ("bibliografia", "bibliography")
 # A line of the page's furniture, compared with every digit the same: the
 # footer "Bootlin - https://bootlin.com 20/334" is one line on every page.
 DIGITS_RE = re.compile(r"\d+")
@@ -309,7 +312,7 @@ def number_outline(bookmarks: Sequence[Bookmark]) -> list[Bookmark]:
         return list(bookmarks)
 
     def apparatus(mark: Bookmark) -> bool:
-        return _letters(mark.title) in APPARATUS_TITLES
+        return is_apparatus(mark.title)
 
     def has_children(index: int) -> bool:
         return index + 1 < len(bookmarks) and bookmarks[index + 1].level > 0
@@ -550,7 +553,7 @@ def section_ranges(
             bool(owners)
             and number is None
             and mark.level <= owners[-1][2]
-            and _letters(mark.title) in APPARATUS_TITLES
+            and is_apparatus(mark.title)
         )
         if not owners or (number is not None and number != current) or beside:
             owners.append((mark.title, mark.page, mark.level))
@@ -637,7 +640,7 @@ def _without_apparatus(spans: Sequence[Span], book_slug: str) -> list[Span]:
     """
     kept = []
     for span in spans:
-        if _letters(span.title) in APPARATUS_TITLES:
+        if is_apparatus(span.title):
             log.event("chunk", "apparatus left out", book=book_slug, title=span.title)
             continue
         kept.append(span)
@@ -900,6 +903,12 @@ def title_offset(text: str, title: str, start: int = 0) -> int | None:
 
 def _letters(text: str) -> str:
     return NON_LETTERS_RE.sub("", text).casefold()
+
+
+def is_apparatus(title: str) -> bool:
+    """A bookmark of the contents, the index, the bibliography or the like."""
+    letters = _letters(title).lstrip("0123456789")
+    return letters in APPARATUS_TITLES or letters.startswith(APPARATUS_PREFIXES)
 
 
 def toc(path: Path) -> list[Bookmark]:

@@ -861,6 +861,14 @@ def test_plan_leaves_out_the_contents_and_the_index(
     assert (chunks[0].page_start, chunks[0].page_end) == (3, 8)
 
 
+def test_a_bibliography_section_is_left_out() -> None:
+    assert chunk_module.is_apparatus("13.2 BIBLIOGRAFIA W PORZĄDKU ALFABETYCZNYM")
+    assert chunk_module.is_apparatus("Bibliography and further reading")
+    assert chunk_module.is_apparatus("Index")
+    assert not chunk_module.is_apparatus("13.1 Sugerowane publikacje dodatkowe")
+    assert not chunk_module.is_apparatus("7.7 References and pointers")
+
+
 def test_a_trusted_outline_names_its_chunk_despite_a_numbered_line() -> None:
     span = Span("Glossary", 0, 320, 330)
     text = "Glossary\n\n19.1 Explain the difference between two orders\n"
