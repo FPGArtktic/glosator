@@ -29,7 +29,8 @@ COPY pyproject.toml ./
 # The dependencies and the model weights are installed before the source is
 # copied, so editing app/ costs one small layer instead of re-downloading
 # 1.4 GB of weights. The stub package exists only so that the project's
-# dependencies can be resolved from pyproject before app/ is there.
+# dependencies can be resolved from pyproject before app/ is there; it
+# carries a version because pyproject reads the version from it.
 #
 # torch comes from the CUDA 12.8 index, the first whose wheels carry kernels
 # for Blackwell (compute capability 12.0, the RTX 5070 Ti). docling runs on
@@ -38,7 +39,7 @@ COPY pyproject.toml ./
 #
 # The dev extra is installed so the image can run its own test suite:
 #   podman run --rm --network none -v .:/src:ro -w /src glosator:latest pytest
-RUN mkdir -p app && touch app/__init__.py \
+RUN mkdir -p app && echo '__version__ = "0"' > app/__init__.py \
     && uv venv /opt/venv \
     && uv pip install --python /opt/venv/bin/python \
         --index-url https://download.pytorch.org/whl/cu128 torch torchvision \
