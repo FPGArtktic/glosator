@@ -5,6 +5,13 @@ Notable changes to glosator, newest first. Versions follow
 The reasons behind the larger decisions are in
 [docs/DECISIONS.md](docs/DECISIONS.md).
 
+## [0.7.3] — 2026-11-04
+
+### Changed
+- An answer that fails the checks is asked for again with the listing
+  lines and table rows it left out named at the end of the prompt, at
+  most 60 of them.
+
 ## [0.7.2] — 2026-11-03
 
 ### Fixed
@@ -227,6 +234,7 @@ The first release: from a PDF to study notes in an Obsidian vault.
   completed or corrected.
 - A watermark digest the shop prints on every page is dropped.
 
+[0.7.3]: https://github.com/FPGArtktic/glosator/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/FPGArtktic/glosator/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/FPGArtktic/glosator/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/FPGArtktic/glosator/compare/v0.6.11...v0.7.0
