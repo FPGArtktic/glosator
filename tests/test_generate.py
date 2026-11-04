@@ -665,6 +665,29 @@ def test_run_asks_again_when_an_answer_drops_a_listing(
     assert "int n = 0;" in path.read_text(encoding="utf-8")
 
 
+def test_code_under_a_heading_the_note_has_no_place_for_counts_as_lost(
+    chunk: Chunk, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    chunk.text_path.write_text("```\nint n = 0;\nn++;\n```\n", encoding="utf-8")
+    stray = "\n## Program\n\n```c\nint n = 0;\nn++;\n```\n"
+    code = "\n## Code\n\n```c\nint n = 0;\nn++;\n```\nCounts.\n"
+    answers = [MODEL_OUTPUT + stray, MODEL_OUTPUT + code]
+    monkeypatch.setattr(
+        generate.ollama, "generate", lambda *_args, **_kwargs: answers.pop(0)
+    )
+    path = generate.run(
+        chunk,
+        book_slug="p1",
+        book_title="Book",
+        book_tag="p1",
+        chapter_title="Basics",
+        figures=[],
+        domain="programming",
+    )
+    assert answers == []
+    assert "int n = 0;" in path.read_text(encoding="utf-8")
+
+
 def test_the_second_ask_names_the_lines_the_first_answer_lost(
     chunk: Chunk, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -414,7 +414,11 @@ def _best_answer(
     asked = prompt
     for attempt in range(1 + config.GENERATE_RETRIES):
         sections = _answer(chunk, model, asked, domain)
-        note = "\n\n".join(sections.values())
+        # Only the sections the note has a place for are written; code
+        # under any other heading is lost and must not count as kept.
+        note = "\n\n".join(
+            text for name, text in sections.items() if name in SECTION_ORDER
+        )
         report = verify.Report(chunk, Path())
         verify.check(report, note, source_text, listings=listing.wanted(domain))
         lost = report.code_lines - report.code_found
