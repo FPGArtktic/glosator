@@ -5,6 +5,11 @@ Notable changes to glosator, newest first. Versions follow
 The reasons behind the larger decisions are in
 [docs/DECISIONS.md](docs/DECISIONS.md).
 
+## [0.7.4] — 2026-11-04
+
+### Fixed
+- `verify` finds a shell command the note copied without its `$ ` prompt.
+
 ## [0.7.3] — 2026-11-04
 
 ### Changed
@@ -234,6 +239,7 @@ The first release: from a PDF to study notes in an Obsidian vault.
   completed or corrected.
 - A watermark digest the shop prints on every page is dropped.
 
+[0.7.4]: https://github.com/FPGArtktic/glosator/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/FPGArtktic/glosator/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/FPGArtktic/glosator/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/FPGArtktic/glosator/compare/v0.7.0...v0.7.1
