@@ -28,6 +28,7 @@ DIGEST_RE = re.compile(r"\b(?=[0-9a-f]*[a-f])(?=[0-9a-f]*\d)[0-9a-f]{32}\b")
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 WORD_RE = re.compile(r"\w+")
 INLINE_CODE_RE = re.compile(r"`([^`\n]+)`")
+SHELL_PROMPT_RE = re.compile(r"^\s*\$\s+")
 TABLE_RULE_RE = re.compile(r"^\|[\s:|-]+\|$")
 # The model sets a cell's mathematics as LaTeX; the book prints it as text.
 # A cell is compared without its dollars and with these commands as the
@@ -133,15 +134,24 @@ def _check_listings(report: Report, note: str, source: str) -> None:
 
 
 def missing_listing_lines(note: str, source: str) -> list[str]:
-    """The source's listing lines the note has nowhere, in the source's order."""
-    squeezed = {_squeeze(line) for line in _code_lines(note)}
-    squeezed |= {_squeeze(span) for span in INLINE_CODE_RE.findall(note)}
+    """The source's listing lines the note has nowhere, in the source's order.
+
+    A lab prints a shell command after a "$ " prompt, which the model
+    often leaves out so that the line can be pasted; lines are compared
+    without it.
+    """
+    squeezed = {_command(line) for line in _code_lines(note)}
+    squeezed |= {_command(span) for span in INLINE_CODE_RE.findall(note)}
     squeezed |= {
         _squeeze(_cells(row)) for row in note.splitlines() if row.startswith("|")
     }
     return [
-        line for line in _listing_lines(source) if not _found(_squeeze(line), squeezed)
+        line for line in _listing_lines(source) if not _found(_command(line), squeezed)
     ]
+
+
+def _command(line: str) -> str:
+    return _squeeze(SHELL_PROMPT_RE.sub("", line))
 
 
 def _listing_lines(source: str) -> list[str]:

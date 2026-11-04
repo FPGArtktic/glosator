@@ -103,6 +103,13 @@ def test_a_line_quoted_without_its_comment_is_found() -> None:
     assert (checked.code_found, checked.code_exact) == (1, 0)
 
 
+def test_a_command_copied_without_its_prompt_is_found() -> None:
+    source = "```\n$ mkdir out\n$ cd out\nls\n```\n"
+    code = "mkdir out\ncd out\n$ ls"
+    checked = verify.check(report(), note(code), source, listings=True)
+    assert (checked.code_found, checked.code_exact) == (3, 0)
+
+
 TABLE = (
     "| Operators | Associativity |\n|---|---|\n"
     "| () [] | left to right |\n| ! ~ | right to left |\n"
