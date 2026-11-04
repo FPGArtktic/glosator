@@ -52,10 +52,14 @@ RUN mkdir -p app && echo '__version__ = "0"' > app/__init__.py \
 # The target directory is explicit: the default is $HOME/.cache/docling, and
 # with --userns=keep-id $HOME is not the one that existed at build time, which
 # leaves 1.4 GB of weights behind a permission error. a+rX for the same reason.
+#
+# RapidOCR's weights are left out: OCR here is tesseract (extract.py), and
+# they come from modelscope.cn, which does not always answer.
 RUN python -c "\
 from pathlib import Path; \
 from docling.utils.model_downloader import download_models; \
-download_models(output_dir=Path('/opt/models/docling'), progress=False)" \
+download_models(output_dir=Path('/opt/models/docling'), progress=False, \
+                with_rapidocr=False)" \
     && chmod -R a+rX /opt/models
 
 # From here on nothing may reach out: a missing model must fail loudly rather
