@@ -655,6 +655,36 @@ def test_run_asks_again_when_an_answer_drops_a_listing(
     assert "int n = 0;" in path.read_text(encoding="utf-8")
 
 
+def test_the_second_ask_names_the_lines_the_first_answer_lost(
+    chunk: Chunk, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    chunk.text_path.write_text(
+        "```\nint a = 1;\nint b = 2;\nint c = 3;\n```\n", encoding="utf-8"
+    )
+    some = "\n## Code\n\n```c\nint a = 1;\n```\nOne line.\n"
+    prompts = []
+
+    def fake_generate(_model, prompt, **_kwargs):
+        prompts.append(prompt)
+        return MODEL_OUTPUT + some
+
+    monkeypatch.setattr(generate.ollama, "generate", fake_generate)
+    generate.run(
+        chunk,
+        book_slug="p1",
+        book_title="Book",
+        book_tag="p1",
+        chapter_title="Basics",
+        figures=[],
+        domain="programming",
+    )
+    assert "PREVIOUS ANSWER" not in prompts[0]
+    assert prompts[1].startswith(prompts[0])
+    reminder = prompts[1][len(prompts[0]) :]
+    assert "int b = 2;\nint c = 3;\n" in reminder
+    assert "int a = 1;" not in reminder
+
+
 def test_run_keeps_the_better_answer_when_both_fail(
     chunk: Chunk, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -401,15 +401,12 @@ def _best_answer(
     """
     best: dict[str, str] = {}
     best_lost = -1
+    asked = prompt
     for attempt in range(1 + config.GENERATE_RETRIES):
-        sections = _answer(chunk, model, prompt, domain)
+        sections = _answer(chunk, model, asked, domain)
+        note = "\n\n".join(sections.values())
         report = verify.Report(chunk, Path())
-        verify.check(
-            report,
-            "\n\n".join(sections.values()),
-            source_text,
-            listings=listing.wanted(domain),
-        )
+        verify.check(report, note, source_text, listings=listing.wanted(domain))
         lost = report.code_lines - report.code_found
         lost += report.table_rows - report.table_found
         if best_lost < 0 or lost < best_lost:
@@ -423,7 +420,24 @@ def _best_answer(
             attempt=attempt + 1,
             problems=report.problems,
         )
+        asked = prompt + _lost_lines_reminder(note, source_text, domain)
     return best
+
+
+def _lost_lines_reminder(note: str, source_text: str, domain: str) -> str:
+    """The lines the answer left out, appended to the prompt asked again.
+
+    Asked the same prompt again, the model summarised the commands of
+    Bootlin's devtool lab a second time; it needs to be told which
+    lines it dropped.
+    """
+    lost = verify.missing_table_rows(note, source_text)
+    if listing.wanted(domain):
+        lost = verify.missing_listing_lines(note, source_text) + lost
+    if not lost:
+        return ""
+    shown = "\n".join(lost[: config.GENERATE_RETRY_MAX_LINES])
+    return "\n\n" + render(load_prompt("retry.md"), lines=shown).strip()
 
 
 def _answer(chunk: Chunk, model: str, prompt: str, domain: str) -> dict[str, str]:

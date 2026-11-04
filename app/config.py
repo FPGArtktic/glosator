@@ -114,6 +114,9 @@ VERIFY_MIN_TABLE_SHARE: float = 0.9
 # An answer that fails those checks is asked for again this many times; the
 # one that lost the fewest listing lines and table rows is kept.
 GENERATE_RETRIES: int = 1
+# The retry names the lines the answer lost, at most this many, so that a
+# chunk that lost everything does not double the prompt.
+GENERATE_RETRY_MAX_LINES: int = 60
 # A quoted listing line this long is found inside a longer line of the note;
 # a shorter one ("}", "n++;") would be found anywhere.
 VERIFY_MIN_QUOTED_CHARS: int = 8
