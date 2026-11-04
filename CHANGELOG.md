@@ -5,6 +5,19 @@ Notable changes to glosator, newest first. Versions follow
 The reasons behind the larger decisions are in
 [docs/DECISIONS.md](docs/DECISIONS.md).
 
+## [0.7.5] — 2026-11-04
+
+### Fixed
+- An answer is no longer split into sections at a `## ` line inside a code
+  block. docling reads a program's output line as a heading, and the rest
+  of the Code section went to a section the note leaves out.
+- The checks on each answer look only at the sections the note will hold.
+
+### Changed
+- The version lives in `app/__init__.py` alone; a release no longer
+  rebuilds the image's dependency and model-weight layer.
+- RapidOCR's weights are not downloaded into the image; OCR is tesseract.
+
 ## [0.7.4] — 2026-11-04
 
 ### Fixed
@@ -239,6 +252,7 @@ The first release: from a PDF to study notes in an Obsidian vault.
   completed or corrected.
 - A watermark digest the shop prints on every page is dropped.
 
+[0.7.5]: https://github.com/FPGArtktic/glosator/compare/v0.7.4...v0.7.5
 [0.7.4]: https://github.com/FPGArtktic/glosator/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/FPGArtktic/glosator/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/FPGArtktic/glosator/compare/v0.7.1...v0.7.2
