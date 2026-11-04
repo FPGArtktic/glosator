@@ -121,21 +121,31 @@ def _check_listings(report: Report, note: str, source: str) -> None:
     between backticks, and a table set as aligned text to a markdown table;
     a line found there counts as found, though never as exact.
     """
-    wanted = [line.rstrip() for line in _code_lines(source) if line.strip()]
-    have = [line.rstrip() for line in _code_lines(note)]
-    squeezed = {_squeeze(line) for line in have}
-    squeezed |= {_squeeze(span) for span in INLINE_CODE_RE.findall(note)}
-    squeezed |= {
-        _squeeze(_cells(row)) for row in note.splitlines() if row.startswith("|")
-    }
-    exact = set(have)
+    wanted = _listing_lines(source)
+    exact = {line.rstrip() for line in _code_lines(note)}
     report.code_lines = len(wanted)
-    report.code_found = sum(_found(_squeeze(line), squeezed) for line in wanted)
+    report.code_found = len(wanted) - len(missing_listing_lines(note, source))
     report.code_exact = sum(line in exact for line in wanted)
     if wanted and report.code_found < config.VERIFY_MIN_CODE_SHARE * len(wanted):
         report.problems.append(
             f"listings: {report.code_found} of {len(wanted)} source lines in the note"
         )
+
+
+def missing_listing_lines(note: str, source: str) -> list[str]:
+    """The source's listing lines the note has nowhere, in the source's order."""
+    squeezed = {_squeeze(line) for line in _code_lines(note)}
+    squeezed |= {_squeeze(span) for span in INLINE_CODE_RE.findall(note)}
+    squeezed |= {
+        _squeeze(_cells(row)) for row in note.splitlines() if row.startswith("|")
+    }
+    return [
+        line for line in _listing_lines(source) if not _found(_squeeze(line), squeezed)
+    ]
+
+
+def _listing_lines(source: str) -> list[str]:
+    return [line.rstrip() for line in _code_lines(source) if line.strip()]
 
 
 def _cells(row: str) -> str:
@@ -159,18 +169,25 @@ def _found(line: str, have: set[str]) -> bool:
 def _check_tables(report: Report, note: str, source: str) -> None:
     """Every row of the source's tables should be a row of the note's."""
     wanted = _table_rows(source)
-    have = _table_rows(note)
-    code_words = {
-        word.casefold() for line in _code_lines(note) for word in WORD_RE.findall(line)
-    }
     report.table_rows = len(wanted)
-    report.table_found = sum(
-        _row_found(row, have) or _row_in_code(row, code_words) for row in wanted
-    )
+    report.table_found = len(wanted) - len(missing_table_rows(note, source))
     if wanted and report.table_found < config.VERIFY_MIN_TABLE_SHARE * len(wanted):
         report.problems.append(
             f"tables: {report.table_found} of {len(wanted)} source rows in the note"
         )
+
+
+def missing_table_rows(note: str, source: str) -> list[str]:
+    """The source's table rows the note has nowhere, cells joined by "|"."""
+    have = _table_rows(note)
+    code_words = {
+        word.casefold() for line in _code_lines(note) for word in WORD_RE.findall(line)
+    }
+    return [
+        row
+        for row in _table_rows(source)
+        if not (_row_found(row, have) or _row_in_code(row, code_words))
+    ]
 
 
 def _row_found(row: str, have: Sequence[str]) -> bool:

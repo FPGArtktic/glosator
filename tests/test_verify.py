@@ -161,6 +161,21 @@ def test_a_ruling_read_into_a_cell_does_not_hide_the_row() -> None:
     assert (checked.table_found, checked.table_rows) == (2, 2)
 
 
+def test_the_lost_lines_and_rows_are_listed_in_order() -> None:
+    source = SOURCE + "\n" + TABLE
+    code = "int count(const char *s)\n{\n    return n;\n}\n"
+    text = (
+        note(code)
+        + "\n| Operators | Associativity |\n|---|---|\n| () [] | left to right |\n"
+    )
+    assert verify.missing_listing_lines(text, source) == [
+        "    int n = 0;",
+        "    while (*s++)",
+        "        n++;",
+    ]
+    assert verify.missing_table_rows(text, source) == ["! ~|right to left"]
+
+
 def test_a_listing_laid_out_as_a_table_is_found_in_the_code() -> None:
     source = (
         "| struct | device *dev; |\n|---|---|\n"
