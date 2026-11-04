@@ -120,6 +120,16 @@ def test_split_sections_and_required_sections() -> None:
     }
     assert generate.missing_sections(sections) == []
     assert generate.missing_sections({"In short": "x"}) == ["Explanation"]
+
+
+def test_a_heading_line_inside_a_listing_stays_in_the_listing() -> None:
+    answer = (
+        "## In short\n\nBuilds.\n\n## Code\n\n```text\n## NOTE: building\nok\n```\n"
+        "Output.\n\n```bash\nmake install\n```\nInstalls.\n\n## Pitfalls\n\nNone.\n"
+    )
+    sections = generate.split_sections(answer)
+    assert list(sections) == ["In short", "Code", "Pitfalls"]
+    assert sections["Code"].endswith("make install\n```\nInstalls.")
     assert generate.missing_sections({"In short": "x", "Explanation": "  "}) == [
         "Explanation"
     ]

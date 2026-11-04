@@ -17,7 +17,7 @@ from datetime import date
 from pathlib import Path
 
 from app import config, extract, listing, log, ollama, verify
-from app.chunk import Chunk, estimate_tokens
+from app.chunk import Chunk, estimate_tokens, inside_fence
 from app.extract import Figure
 from app.language import ENGLISH, NOTHING_HERE, Language
 
@@ -82,8 +82,18 @@ def normalise_math(text: str) -> str:
 
 
 def split_sections(markdown: str) -> dict[str, str]:
-    """``## Heading`` to body text, for reassembly in the contract's order."""
-    matches = list(SECTION_RE.finditer(markdown))
+    """``## Heading`` to body text, for reassembly in the contract's order.
+
+    A "## " line inside a code block is not a heading: docling reads a
+    program's output line ("## NOTE: compiling from external source") as
+    one, and the model copies it into the listing. Cut there, the rest of
+    the Code section went to a section the note has no place for.
+    """
+    matches = [
+        match
+        for match in SECTION_RE.finditer(markdown)
+        if not inside_fence(markdown[: match.start()])
+    ]
     sections: dict[str, str] = {}
     for index, match in enumerate(matches):
         end = matches[index + 1].start() if index + 1 < len(matches) else len(markdown)
