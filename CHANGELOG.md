@@ -5,6 +5,12 @@ Notable changes to glosator, newest first. Versions follow
 The reasons behind the larger decisions are in
 [docs/DECISIONS.md](docs/DECISIONS.md).
 
+## [0.7.8] — 2026-11-08
+
+### Fixed
+- A tip that an EPUB sets beside an icon, as a one-row table, is read as
+  a quote. Notes copied it as a table with an empty first column.
+
 ## [0.7.7] — 2026-11-08
 
 ### Fixed
@@ -269,6 +275,9 @@ The first release: from a PDF to study notes in an Obsidian vault.
   completed or corrected.
 - A watermark digest the shop prints on every page is dropped.
 
+[0.7.8]: https://github.com/FPGArtktic/glosator/compare/v0.7.7...v0.7.8
+[0.7.7]: https://github.com/FPGArtktic/glosator/compare/v0.7.6...v0.7.7
+[0.7.6]: https://github.com/FPGArtktic/glosator/compare/v0.7.5...v0.7.6
 [0.7.5]: https://github.com/FPGArtktic/glosator/compare/v0.7.4...v0.7.5
 [0.7.4]: https://github.com/FPGArtktic/glosator/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/FPGArtktic/glosator/compare/v0.7.2...v0.7.3
