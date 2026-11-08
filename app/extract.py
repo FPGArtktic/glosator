@@ -33,10 +33,16 @@ from app import config, listing, log, pdf
 
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*\S)\s*$", re.MULTILINE)
 
+# A heading's leading number, unless a hyphen joins it to a word: the "1"
+# of "1-Wire" (a bus) or "8-bitowy" is part of a name, not a chapter.
+CHAPTER_NUMBER_RE = re.compile(
+    r"\s*(?:chapter|rozdzia[lł])?\s*(\d{1,2})\b(?![-\u2010\u2013])", re.IGNORECASE
+)
 # A chapter heading is numbered and that number is not a section number:
 # "3 Sampling" and "Chapter 3" are chapters, "3.12 Windows" is not.
 CHAPTER_HEADING_RE = re.compile(
-    r"\s*(?:chapter|rozdzia[lł])?\s*(\d{1,2})(?!\s*\.\s*\d)\b", re.IGNORECASE
+    r"\s*(?:chapter|rozdzia[lł])?\s*(\d{1,2})(?!\s*\.\s*\d)\b(?![-\u2010\u2013])",
+    re.IGNORECASE,
 )
 FIGURES_JSON = "figures.json"
 TABLE_ROW_RE = re.compile(r"^\|.*\|[ \t]*$", re.MULTILINE)
@@ -93,7 +99,7 @@ def slugify(text: str) -> str:
 
 def chapter_number(title: str) -> int | None:
     """Leading chapter number of a heading, if it has one."""
-    match = re.match(r"\s*(?:chapter|rozdzia[lł])?\s*(\d{1,2})\b", title, re.IGNORECASE)
+    match = CHAPTER_NUMBER_RE.match(title)
     return int(match.group(1)) if match else None
 
 

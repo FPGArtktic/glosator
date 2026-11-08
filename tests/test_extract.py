@@ -31,6 +31,9 @@ def test_slugify_folds_the_letters_nfkd_leaves_whole() -> None:
         ("Chapter 11 Oscillators", 11),
         ("Rozdział 3 Wzmacniacze", 3),
         ("Appendix A", None),
+        ("1-Wire", None),
+        ("8-bitowe mikrokontrolery", None),
+        ("Rozdział 7. Komunikacja", 7),
     ],
 )
 def test_chapter_number(title: str, expected: int | None) -> None:
@@ -47,6 +50,7 @@ def test_chapter_number(title: str, expected: int | None) -> None:
         ("EXERCISE 4.3", False),
         ("Remarks", False),
         ("Figure 4.19", False),
+        ("1-Wire", False),
     ],
 )
 def test_is_chapter_heading(title: str, expected: bool) -> None:

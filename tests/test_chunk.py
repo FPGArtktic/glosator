@@ -784,6 +784,19 @@ def test_outline_chapter_is_the_last_chapter_bookmark_before_the_page() -> None:
     assert chunk_module.outline_chapter([], 40) is None
 
 
+def test_a_bus_named_with_a_number_does_not_start_a_chapter() -> None:
+    bookmarks = [
+        Bookmark("Rozdział 7. Komunikacja z urządzeniami peryferyjnymi", 0, 207),
+        Bookmark("Komunikacja szeregowa", 1, 208),
+        Bookmark("1-Wire", 2, 216),
+        Bookmark("Łącze równoległe", 2, 217),
+        Bookmark("Rozdział 8. Budowanie systemu", 0, 236),
+    ]
+    assert chunk_module.outline_chapter(bookmarks, 216) == 7
+    assert chunk_module.outline_chapter(bookmarks, 220) == 7
+    assert Span("1-Wire", 2, 216, 217, outline_chapter=7).chapter == 7
+
+
 def test_a_page_range_span_takes_its_chapter_from_the_outline() -> None:
     assert Span("pages 80-90", 0, 80, 90, outline_chapter=2).chapter == 2
 
