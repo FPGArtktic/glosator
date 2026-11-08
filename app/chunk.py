@@ -813,21 +813,29 @@ def group_spans(
 ) -> list[list[Span]]:
     """Merge consecutive spans into chunks within the token budget.
 
-    Never splits a span, never merges across a chapter boundary.
+    Never splits a span, never merges across a chapter boundary. The pieces
+    merged are outline_units: a bookmark stays with the bookmarks under it
+    when they fit one note, and a unit that fills a note is a note of its own.
     """
     sizes = budget or note_budget()
     groups: list[list[Span]] = []
     current: list[Span] = []
     current_tokens = 0
 
-    for span, tokens in zip(spans, token_counts, strict=True):
-        crosses_chapter = bool(current) and span.chapter != current[0].chapter
-        too_big = bool(current) and current_tokens + tokens > sizes.max_tokens
-        if crosses_chapter or too_big:
+    for unit in outline_units(spans, token_counts, sizes.max_tokens):
+        unit_spans = [spans[index] for index in unit]
+        tokens = sum(token_counts[index] for index in unit)
+        # The bookmark of a section too long for one note: its children
+        # come next, as units of their own, and its note starts here.
+        opens_cut_section = _subtree_end(spans, unit[0]) > unit[-1] + 1
+        if current and (
+            opens_cut_section
+            or _starts_a_note(current, current_tokens, unit_spans, tokens, sizes)
+        ):
             groups.append(current)
             current, current_tokens = [], 0
 
-        current.append(span)
+        current.extend(unit_spans)
         current_tokens += tokens
         if current_tokens >= sizes.min_tokens:
             groups.append(current)
@@ -836,6 +844,62 @@ def group_spans(
     if current:
         groups.append(current)
     return _fold_small(groups, dict(zip(spans, token_counts, strict=True)))
+
+
+def _starts_a_note(
+    current: Sequence[Span],
+    current_tokens: int,
+    unit: Sequence[Span],
+    tokens: int,
+    sizes: Budget,
+) -> bool:
+    """True when ``unit`` must not join the group gathered so far."""
+    crosses_chapter = unit[0].chapter != current[0].chapter
+    too_big = current_tokens + tokens > sizes.max_tokens
+    # Joined to a short section before it, a whole pattern was named after
+    # that section, and the pattern's own name sank into the parts list. A
+    # bare heading before it is no note to keep apart: alone, _fold_small
+    # would hand it to the note before.
+    fills_a_note = (
+        tokens >= sizes.min_tokens and current_tokens >= config.CHUNK_FOLD_TOKENS
+    )
+    return crosses_chapter or too_big or fills_a_note
+
+
+def outline_units(
+    spans: Sequence[Span], token_counts: Sequence[int], max_tokens: int
+) -> list[list[int]]:
+    """Indices of the spans that go into a note together, in order.
+
+    A unit is a bookmark with every bookmark under it, when all of them fit
+    ``max_tokens``; otherwise the bookmark alone, and its children are units
+    of their own. Preschern's "Mistrz języka C" hangs Kontekst, Problem,
+    Rozwiązanie, Skutki under each of its patterns. Merged span by span to
+    the budget, the notes began mid-pattern and eight of them were titled
+    "Skutki".
+    """
+    units: list[list[int]] = []
+    index = 0
+    while index < len(spans):
+        end = _subtree_end(spans, index)
+        if sum(token_counts[index:end]) > max_tokens:
+            end = index + 1
+        units.append(list(range(index, end)))
+        index = end
+    return units
+
+
+def _subtree_end(spans: Sequence[Span], index: int) -> int:
+    """Index just past the spans under ``spans[index]`` in its chapter."""
+    head = spans[index]
+    end = index + 1
+    while (
+        end < len(spans)
+        and spans[end].level > head.level
+        and spans[end].chapter == head.chapter
+    ):
+        end += 1
+    return end
 
 
 def _fold_small(groups: list[list[Span]], tokens: dict[Span, int]) -> list[list[Span]]:

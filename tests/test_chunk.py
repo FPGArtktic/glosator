@@ -129,6 +129,62 @@ def test_group_spans_flushes_at_the_minimum() -> None:
     assert len(groups) == 2
 
 
+def _pattern(name: str, page: int) -> list[Span]:
+    """A pattern of Preschern's book: its name, then its parts under it."""
+    parts = ["Kontekst", "Problem", "Rozwiązanie", "Skutki"]
+    return [Span(name, 1, page, page, 1)] + [
+        Span(part, 2, page + offset, page + offset, 1)
+        for offset, part in enumerate(parts, start=1)
+    ]
+
+
+def test_a_pattern_that_fits_a_note_is_not_cut_between_its_parts() -> None:
+    spans = _pattern("Podział funkcji", 1) + _pattern("Reguła samuraja", 10)
+    part = config.CHUNK_MIN_TOKENS // 4
+    # Merged span by span, the first note took "Reguła samuraja" and its
+    # "Kontekst" and the second began at its "Problem".
+    tokens = [50, part, part, part, part // 2, 50, part, part, part, part]
+    groups = chunk_module.group_spans(spans, tokens)
+    assert [group[0].title for group in groups] == [
+        "Podział funkcji",
+        "Reguła samuraja",
+    ]
+    assert [len(group) for group in groups] == [5, 5]
+
+
+def test_a_section_that_fills_a_note_is_not_joined_to_a_short_one_before_it() -> None:
+    spans = [Span("Przykład roboczy", 1, 1, 1, 1), *_pattern("Pamięć wieczna", 2)]
+    part = config.CHUNK_MIN_TOKENS // 4
+    groups = chunk_module.group_spans(spans, [part, 50, part, part, part, part])
+    assert [group[0].title for group in groups] == [
+        "Przykład roboczy",
+        "Pamięć wieczna",
+    ]
+
+
+def test_a_pattern_over_the_budget_is_cut_between_its_parts() -> None:
+    spans = _pattern("Pula pamięci", 1)
+    half = config.CHUNK_MAX_TOKENS // 2
+    groups = chunk_module.group_spans(spans, [50, half, half, half, half])
+    assert sum(len(group) for group in groups) == len(spans)
+    assert len(groups) > 1
+
+
+def test_a_pattern_over_the_budget_starts_a_note_of_its_own() -> None:
+    previous = _pattern("Wzorzec 2. Grammar", 1)
+    long = _pattern("Wzorzec 3. Style Transfer", 10)
+    part = config.CHUNK_MIN_TOKENS // 8
+    half = config.CHUNK_MAX_TOKENS // 2
+    tokens = [50, part, part, part, part, 50, half, half, half, half]
+    groups = chunk_module.group_spans(previous + long, tokens)
+    # Its name alone fitted the end of the note before; its Problem then
+    # opened a note named "Problem".
+    assert [group[0].title for group in groups][:2] == [
+        "Wzorzec 2. Grammar",
+        "Wzorzec 3. Style Transfer",
+    ]
+
+
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
