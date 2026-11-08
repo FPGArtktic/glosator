@@ -19,7 +19,7 @@ Two to four sentences: what this is and why it matters.
 
 ## Explanation
 Plain language, 300-700 words. Analogies are allowed but must be marked as
-analogies ("as an analogy, ..."). Explain every symbol you use.
+analogies ("{{analogy}}, ..."). Explain every symbol you use.
 Every table the source prints goes into the explanation whole, as a markdown
 table next to the paragraph about it: every row and every cell as the source
 has them, also where it reaches you as a block of aligned text rather than a

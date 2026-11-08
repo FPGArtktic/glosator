@@ -153,6 +153,7 @@ def write_prompt(
         domain=extract.slugify(domain),
         count=count,
         language=language.name,
+        analogy=language.analogy,
         glossary=generate.load_prompt(language.glossary_prompt).strip(),
     )
     return generate.write_note(

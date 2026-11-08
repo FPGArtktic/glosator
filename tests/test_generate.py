@@ -62,6 +62,14 @@ def test_note_prompt_has_no_leftover_placeholders(chunk: Chunk) -> None:
     assert "Write the note in Polish" in prompt
 
 
+def test_the_analogy_marker_is_quoted_in_the_notes_language(chunk: Chunk) -> None:
+    polish = generate.note_prompt(chunk, "body", "Book", "electronics", POLISH)
+    assert '("przez analogię, ...")' in polish
+    assert "as an analogy" not in polish
+    english = generate.note_prompt(chunk, "body", "Book", "electronics")
+    assert '("as an analogy, ...")' in english
+
+
 def test_a_slide_deck_asks_for_the_slides_to_be_explained(chunk: Chunk) -> None:
     prompt = generate.note_prompt(chunk, "body", "Course", "embedded", slides=True)
     assert "{{" not in prompt

@@ -41,6 +41,9 @@ class Language:
     # What a section with nothing to hold says: the prompt quotes it in
     # English, and the model copies the quote rather than translate it.
     nothing_here: str = NOTHING_HERE
+    # How the explanation marks an analogy. Quoted in English, the marker
+    # came back in English inside one Polish note in thirty.
+    analogy: str = "as an analogy"
 
     def heading(self, name: str) -> str:
         return self.headings.get(name, name)
@@ -64,6 +67,7 @@ POLISH = Language(
     sections="Sekcje",
     chapter_map="mapa rozdziału",
     nothing_here="Brak w tej sekcji.",
+    analogy="przez analogię",
     headings={
         "In short": "W skrócie",
         "Explanation": "Wyjaśnienie",

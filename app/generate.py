@@ -384,6 +384,7 @@ def note_prompt(
         pages=f"{chunk.page_start}-{chunk.page_end}",
         text=source_text,
         language=language.name,
+        analogy=language.analogy,
         glossary=load_prompt(language.glossary_prompt).strip(),
         technical=load_prompt(technical).strip(),
         parts=_parts_instruction(chunk),
