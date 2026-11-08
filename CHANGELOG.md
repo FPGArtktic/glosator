@@ -5,6 +5,13 @@ Notable changes to glosator, newest first. Versions follow
 The reasons behind the larger decisions are in
 [docs/DECISIONS.md](docs/DECISIONS.md).
 
+## [0.7.9] — 2026-11-08
+
+### Fixed
+- A bookmark that begins with a number joined to a word ("1-Wire") is
+  not a chapter. It put its note in chapter 1 and left the sections
+  after it without a chapter.
+
 ## [0.7.8] — 2026-11-08
 
 ### Fixed
@@ -275,6 +282,7 @@ The first release: from a PDF to study notes in an Obsidian vault.
   completed or corrected.
 - A watermark digest the shop prints on every page is dropped.
 
+[0.7.9]: https://github.com/FPGArtktic/glosator/compare/v0.7.8...v0.7.9
 [0.7.8]: https://github.com/FPGArtktic/glosator/compare/v0.7.7...v0.7.8
 [0.7.7]: https://github.com/FPGArtktic/glosator/compare/v0.7.6...v0.7.7
 [0.7.6]: https://github.com/FPGArtktic/glosator/compare/v0.7.5...v0.7.6
