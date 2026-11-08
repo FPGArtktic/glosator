@@ -5,6 +5,17 @@ Notable changes to glosator, newest first. Versions follow
 The reasons behind the larger decisions are in
 [docs/DECISIONS.md](docs/DECISIONS.md).
 
+## [0.7.6] — 2026-11-08
+
+### Fixed
+- A section stays in one note with the sections under it when they fit
+  the budget. A book of patterns (Kontekst, Problem, Rozwiązanie, Skutki
+  under each) had notes that ran from one pattern into the next and were
+  named after whichever part came first.
+- A note that begins inside a section too long for one note is named
+  "<section> — <part>" instead of "Rozwiązanie" or "Skutki" alone.
+- Two patterns sharing a note are listed by their names.
+
 ## [0.7.5] — 2026-11-04
 
 ### Fixed
