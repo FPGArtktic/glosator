@@ -185,6 +185,49 @@ def test_a_pattern_over_the_budget_starts_a_note_of_its_own() -> None:
     ]
 
 
+def test_a_step_is_named_after_its_pattern_not_its_part() -> None:
+    chapter = Span("Rozdział 2. Zarządzanie stylem treści", 0, 1, 1, 2)
+    pattern = Span("Wzorzec 5. Content Optimization", 1, 2, 2, 2)
+    solution = Span("Rozwiązanie", 2, 3, 3, 2)
+    step = Span("Krok 1. Wygenerowanie par", 3, 4, 4, 2)
+    parents = chunk_module.outline_parents([chapter, pattern, solution, step])
+    assert (
+        chunk_module.qualified_title("Krok 1. Wygenerowanie par", step, parents)
+        == "Wzorzec 5. Content Optimization — Krok 1. Wygenerowanie par"
+    )
+
+
+def test_a_note_that_begins_inside_a_pattern_carries_its_name() -> None:
+    chapter = Span("Rozdział 1. Obsługa błędów", 0, 1, 1, 1)
+    example = Span("Przykład roboczy", 1, 2, 2, 1)
+    pattern = _pattern("Reguła samuraja", 3)
+    parents = chunk_module.outline_parents([chapter, example, *pattern])
+    skutki = pattern[-1]
+    assert (
+        chunk_module.qualified_title("Skutki", skutki, parents)
+        == "Reguła samuraja — Skutki"
+    )
+    assert (
+        chunk_module.qualified_title("Przykład roboczy", example, parents)
+        == "Przykład roboczy"
+    )
+    assert (
+        chunk_module.qualified_title("Reguła samuraja", pattern[0], parents)
+        == "Reguła samuraja"
+    )
+
+
+def test_a_numbered_section_keeps_its_own_title() -> None:
+    chapter = Span("2 Transistors", 0, 1, 1)
+    section = Span("2.3 Followers", 1, 2, 2)
+    subsection = Span("2.3.1 Emitter follower", 2, 3, 3)
+    parents = chunk_module.outline_parents([chapter, section, subsection])
+    assert (
+        chunk_module.qualified_title("Emitter follower", subsection, parents)
+        == "Emitter follower"
+    )
+
+
 @pytest.mark.parametrize(
     ("text", "expected"),
     [

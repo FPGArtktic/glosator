@@ -88,6 +88,9 @@ DIGITS_RE = re.compile(r"\d+")
 # A heading this short ("## 4") begins too many titles to stand for one.
 TITLE_PREFIX_MIN_CHARS = 6
 CONTINUED = " (continued)"
+# Between a section's title and its part's: "Reguła samuraja — Skutki". A
+# colon would be dropped from the file name (generate.NAME_FORBIDDEN_RE).
+QUALIFIER = " — "
 FENCE = "```"
 # balanced_split raises its trial ceiling by a twentieth at a time.
 BALANCE_STEP_DIVISOR = 20
@@ -1197,12 +1200,14 @@ def plan(
     used: set[str] = set()
     carried: tuple[str, str] | None = None
     previous_head: Span | None = None
+    parents = outline_parents(spans)
     for order, group in enumerate(groups, start=1):
         head = group[0]
         text = "\n\n".join(text_by_span[span] for span in group).strip()
         chapter, number, title = identify(
             head, text, order, carried, trusted=epub.is_epub(pdf_path)
         )
+        title = qualified_title(title, head, parents)
         # A part of a section cut to the budget has a number of its own when
         # the section has none ("011 Podejście 2. Szczegóły" after "010 ..."),
         # so the repeated number cannot tell it is a continuation.
@@ -1265,6 +1270,52 @@ def merged_parts(group: Sequence[Span]) -> tuple[str, ...]:
         if name not in names:
             names.append(name)
     return tuple(names) if len(names) > 1 else ()
+
+
+def outline_parents(spans: Sequence[Span]) -> dict[Span, Span | None]:
+    """The bookmark each span sits under, or None for a top-level one."""
+    above: list[Span] = []
+    parents: dict[Span, Span | None] = {}
+    for span in spans:
+        while above and above[-1].level >= span.level:
+            above.pop()
+        parents[span] = above[-1] if above else None
+        above.append(span)
+    return parents
+
+
+def qualified_title(title: str, head: Span, parents: dict[Span, Span | None]) -> str:
+    """The title of a note that begins inside a section, with that section's.
+
+    A pattern too long for one note is cut between its parts, and the note
+    that starts at "Skutki" is "Reguła samuraja — Skutki"; eight notes of one
+    book were "Skutki" alone. Only an unnumbered title the outline gave is
+    qualified, and never by a chapter: "Przykład roboczy" under "Rozdział 1"
+    stays as it is. The section named is the outermost one below the
+    chapter: "Krok 1" under "Rozwiązanie" under "Wzorzec 5. Content
+    Optimization" is that pattern's step, not a step of some "Rozwiązanie".
+    """
+    if head.section or title != section_title(head.title):
+        return title
+    section = _section_above(head, parents)
+    if section is None:
+        return title
+    return f"{section_title(section.title)}{QUALIFIER}{title}"
+
+
+def _section_above(head: Span, parents: dict[Span, Span | None]) -> Span | None:
+    """The outermost bookmark above ``head`` inside its chapter, if any."""
+    found = None
+    parent = parents.get(head)
+    while (
+        parent is not None
+        and parents.get(parent) is not None
+        and parent.chapter == head.chapter
+        and not extract.is_chapter_heading(parent.title)
+    ):
+        found = parent
+        parent = parents.get(parent)
+    return found
 
 
 def oversized(chunks: Sequence[Chunk], *, max_tokens: int | None = None) -> list[Chunk]:
