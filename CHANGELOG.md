@@ -5,6 +5,12 @@ Notable changes to glosator, newest first. Versions follow
 The reasons behind the larger decisions are in
 [docs/DECISIONS.md](docs/DECISIONS.md).
 
+## [0.7.7] — 2026-11-08
+
+### Fixed
+- A Polish note marks an analogy in Polish ("przez analogię"); the
+  prompt quoted the marker in English and one note in thirty copied it.
+
 ## [0.7.6] — 2026-11-08
 
 ### Fixed
