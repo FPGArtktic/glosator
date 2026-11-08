@@ -473,6 +473,10 @@ def _table(element: Tag, document: str, pending: set[str]) -> Iterator[Block]:
             for cell in row:
                 yield from _blocks(cell, document, pending)
         return
+    box = _box_text_cell(cells)
+    if box is not None:
+        yield from _quoted(_blocks(box, document, pending))
+        return
     lines = [
         "| " + " | ".join(_inline(cell).replace("|", "\\|") for cell in row) + " |"
         for row in cells
@@ -483,6 +487,25 @@ def _table(element: Tag, document: str, pending: set[str]) -> Iterator[Block]:
     width = max(len(row) for row in cells)
     lines.insert(1, "|" + " --- |" * width)
     yield _with(Block("\n".join(lines)), element, document)
+
+
+def _box_text_cell(cells: list[list[Tag]]) -> Tag | None:
+    """The text of a box set as a table: one row, text in one cell only.
+
+    A publisher's template lays a tip out as an icon in one cell and the
+    text in the next. As a markdown table it reads "|  | a paragraph |",
+    and the model and ``verify`` treat it as data to copy row by row.
+    """
+    if len(cells) != 1:
+        return None
+    with_text = [cell for cell in cells[0] if _inline(cell)]
+    return with_text[0] if len(with_text) == 1 else None
+
+
+def _quoted(blocks: Iterator[Block]) -> Iterator[Block]:
+    for block in blocks:
+        block.text = "\n".join(f"> {line}" for line in block.text.splitlines())
+        yield block
 
 
 def extract(book_slug: str, path: Path) -> list[Path]:

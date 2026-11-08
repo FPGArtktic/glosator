@@ -123,6 +123,27 @@ def test_a_page_naming_the_buyer_is_left_out(sample: Path) -> None:
     assert "@" not in text
 
 
+def _block_texts(body: str) -> list[str]:
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(xhtml(body), "xml")
+    return [block.text for block in epub._blocks(soup.body, "Text/a.xhtml", set())]
+
+
+def test_a_tip_beside_an_icon_is_a_quote_not_a_table() -> None:
+    tip = (
+        '<table id="t1"><tbody><tr><td class="ikonka"><img src="i.jpeg"/></td>'
+        '<td><p class="uwaga">Keep the interfaces small.</p><p>Really.</p></td>'
+        "</tr></tbody></table>"
+    )
+    assert _block_texts(tip) == ["> Keep the interfaces small.", "> Really."]
+
+
+def test_a_table_of_one_row_with_two_texts_stays_a_table() -> None:
+    row = "<table><tr><td>push</td><td>O(1)</td></tr></table>"
+    assert _block_texts(row) == ["| push | O(1) |\n| --- | --- |"]
+
+
 def test_long_text_is_cut_into_pages_at_paragraphs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
