@@ -1262,14 +1262,35 @@ def merged_parts(group: Sequence[Span]) -> tuple[str, ...]:
     Named after its first section only, the note of "1.6 Tablice" and "1.7
     Funkcje" was about arrays: the model took the title for the subject and
     left the whole of 1.7, its listing included, out.
+
+    Two patterns in one note are listed by their names, not as their names
+    with "Kontekst", "Problem" and the rest once between them: a section
+    nested in one listed before it is left to that one.
     """
+    outermost = _part_names(_outermost(group))
+    if len(outermost) > 1:
+        return tuple(outermost)
+    names = _part_names(group)
+    return tuple(names) if len(names) > 1 else ()
+
+
+def _part_names(spans: Sequence[Span]) -> list[str]:
     names: list[str] = []
-    for span in group:
+    for span in spans:
         number = span.section
         name = f"{number} {section_title(span.title)}" if number else span.title
         if name not in names:
             names.append(name)
-    return tuple(names) if len(names) > 1 else ()
+    return names
+
+
+def _outermost(group: Sequence[Span]) -> list[Span]:
+    """The spans of ``group`` that no span before them in it contains."""
+    kept: list[Span] = []
+    for span in group:
+        if all(span.level <= other.level for other in kept):
+            kept.append(span)
+    return kept
 
 
 def outline_parents(spans: Sequence[Span]) -> dict[Span, Span | None]:

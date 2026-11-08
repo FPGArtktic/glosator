@@ -228,6 +228,25 @@ def test_a_numbered_section_keeps_its_own_title() -> None:
     )
 
 
+def test_two_patterns_in_one_note_are_listed_by_name() -> None:
+    group = [
+        Span("Skutki", 2, 1, 1, 1),
+        *_pattern("Pliki nagłówkowe", 2),
+        *_pattern("Uchwyt", 8),
+    ]
+    assert chunk_module.merged_parts(group) == ("Skutki", "Pliki nagłówkowe", "Uchwyt")
+
+
+def test_one_whole_pattern_lists_its_parts() -> None:
+    assert chunk_module.merged_parts(_pattern("Uchwyt", 1)) == (
+        "Uchwyt",
+        "Kontekst",
+        "Problem",
+        "Rozwiązanie",
+        "Skutki",
+    )
+
+
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
