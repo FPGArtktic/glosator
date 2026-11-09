@@ -2,4 +2,4 @@
 # Copyright (C) 2026 Mateusz <109816464+FPGArtktic@users.noreply.github.com>
 """glosator: PDF textbook to sequential study notes."""
 
-__version__ = "0.7.10"
+__version__ = "0.7.11"
