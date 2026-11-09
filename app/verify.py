@@ -30,10 +30,49 @@ WORD_RE = re.compile(r"\w+")
 INLINE_CODE_RE = re.compile(r"`([^`\n]+)`")
 SHELL_PROMPT_RE = re.compile(r"^\s*\$\s+")
 TABLE_RULE_RE = re.compile(r"^\|[\s:|-]+\|$")
+# Escapes, not the letters: several Greek letters look like Latin ones.
+GREEK_LETTERS = {
+    "\\alpha": "\u03b1",
+    "\\beta": "\u03b2",
+    "\\gamma": "\u03b3",
+    "\\delta": "\u03b4",
+    "\\epsilon": "\u03b5",
+    "\\varepsilon": "\u03b5",
+    "\\zeta": "\u03b6",
+    "\\eta": "\u03b7",
+    "\\theta": "\u03b8",
+    "\\kappa": "\u03ba",
+    "\\lambda": "\u03bb",
+    "\\mu": "\u03bc",
+    "\\nu": "\u03bd",
+    "\\xi": "\u03be",
+    "\\pi": "\u03c0",
+    "\\rho": "\u03c1",
+    "\\sigma": "\u03c3",
+    "\\tau": "\u03c4",
+    "\\phi": "\u03c6",
+    "\\varphi": "\u03c6",
+    "\\chi": "\u03c7",
+    "\\psi": "\u03c8",
+    "\\omega": "\u03c9",
+    "\\Gamma": "\u0393",
+    "\\Delta": "\u0394",
+    "\\Theta": "\u0398",
+    "\\Lambda": "\u039b",
+    "\\Pi": "\u03a0",
+    "\\Sigma": "\u03a3",
+    "\\Phi": "\u03a6",
+    "\\Psi": "\u03a8",
+    "\\Omega": "\u03a9",
+}
+# The micro and ohm signs have code points of their own; the model writes
+# \mu and \Omega, which stand for the Greek letters.
+LOOKALIKE_SIGNS = str.maketrans({"\u00b5": "\u03bc", "\u2126": "\u03a9"})
 # The model sets a cell's mathematics as LaTeX; the book prints it as text.
 # A cell is compared without its dollars and with these commands as the
 # characters they stand for.
 LATEX_SYMBOLS = {
+    **GREEK_LETTERS,
     "\\infty": "∞",
     "\\neq": "≠",
     "\\ne": "≠",
@@ -254,13 +293,14 @@ def _table_rows(text: str) -> list[str]:
 
 def _cell(cell: str) -> str:
     """A table cell as the book would print it, spacing squeezed."""
+    # Commands first: with the dollars gone, "$\mu$A" would read "\muA".
+    cell = LATEX_SYMBOL_RE.sub(lambda match: LATEX_SYMBOLS[match.group()], cell)
     # The model sets code in a cell between backticks; the book does not.
     cell = cell.replace("`", "").replace("$", "")
     # OCR of a table drawn as a picture keeps a ruling as "&#124;", an
     # escaped "|", which the model rightly leaves out.
     cell = html.unescape(cell).replace("|", " ")
-    cell = LATEX_SYMBOL_RE.sub(lambda match: LATEX_SYMBOLS[match.group()], cell)
-    return _squeeze(cell)
+    return _squeeze(cell.translate(LOOKALIKE_SIGNS))
 
 
 def _code_lines(text: str) -> list[str]:

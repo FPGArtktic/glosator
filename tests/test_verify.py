@@ -161,6 +161,20 @@ def test_a_table_row_matches_with_its_mathematics_as_latex() -> None:
     assert (checked.table_found, checked.table_rows) == (3, 3)
 
 
+def test_a_table_row_matches_with_greek_letters_as_latex() -> None:
+    # The book prints a micro sign and an ohm sign; the model writes LaTeX.
+    source = (
+        "| Prąd | Rezystor |\n|---|---|\n| 12 mA | 1 \u03a9 |\n"
+        "| 23 \u00b5A | 10 \u2126 |\n| \u03c6 | 2\u03c0 |\n"
+    )
+    text = note("") + (
+        "\n| Prąd | Rezystor |\n|---|---|\n| 12 mA | 1 $\\Omega$ |\n"
+        "| 23 $\\mu$A | 10 $\\Omega$ |\n| $\\phi$ | $2\\pi$ |\n"
+    )
+    checked = verify.check(report(), text, source, listings=False)
+    assert (checked.table_found, checked.table_rows) == (4, 4)
+
+
 def test_a_ruling_read_into_a_cell_does_not_hide_the_row() -> None:
     source = "| Pin | Mode |\n|---|---|\n| 0 | &#124;Serial flash |\n"
     text = note("") + "\n| Pin | Mode |\n|---|---|\n| 0 | Serial flash |\n"
