@@ -5,6 +5,13 @@ Notable changes to glosator, newest first. Versions follow
 The reasons behind the larger decisions are in
 [docs/DECISIONS.md](docs/DECISIONS.md).
 
+## [0.7.10] — 2026-11-09
+
+### Fixed
+- `verify` reads Greek letters set as LaTeX in a table cell (`$\Omega$`,
+  `$\mu$A`) and the micro and ohm signs as the same letters. A table of
+  resistances counted as lost and its note was generated twice.
+
 ## [0.7.9] — 2026-11-08
 
 ### Fixed
@@ -282,6 +289,7 @@ The first release: from a PDF to study notes in an Obsidian vault.
   completed or corrected.
 - A watermark digest the shop prints on every page is dropped.
 
+[0.7.10]: https://github.com/FPGArtktic/glosator/compare/v0.7.9...v0.7.10
 [0.7.9]: https://github.com/FPGArtktic/glosator/compare/v0.7.8...v0.7.9
 [0.7.8]: https://github.com/FPGArtktic/glosator/compare/v0.7.7...v0.7.8
 [0.7.7]: https://github.com/FPGArtktic/glosator/compare/v0.7.6...v0.7.7
