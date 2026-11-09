@@ -929,6 +929,19 @@ def test_an_outline_with_unnumbered_children_of_sections_is_deep() -> None:
     assert not chunk_module.is_deep_outline(shallow)
 
 
+def test_numbered_chapters_with_unnumbered_sections_are_not_deep() -> None:
+    marks = [
+        Bookmark("Część I. Podstawy uczenia maszynowego", 0, 25),
+        Bookmark("1. Krajobraz uczenia maszynowego", 1, 27),
+        Bookmark("Czym jest uczenie maszynowe?", 2, 28),
+        Bookmark("Rodzaje systemów uczenia maszynowego", 2, 33),
+        Bookmark("Nadzorowanie uczenia", 3, 33),
+        Bookmark("2. Nasz pierwszy projekt uczenia maszynowego", 1, 61),
+        Bookmark("Praca z rzeczywistymi danymi", 2, 61),
+    ]
+    assert not chunk_module.is_deep_outline(marks)
+
+
 def test_section_ranges_give_each_section_its_children_and_its_own_title() -> None:
     assert chunk_module.section_ranges(LPI_OUTLINE, 44) == [
         ("Learning Materials: LPIC-1 (101)", 1, 11),

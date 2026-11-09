@@ -536,15 +536,20 @@ def is_deep_outline(bookmarks: Sequence[Bookmark]) -> bool:
     title repeats in every lesson, and the children share their pages with
     each other, so a span per bookmark reads the same page into several
     chunks and names a chunk "003 Introduction".
+
+    Only a section's number counts ("101.1"). A chapter numbered "1." with
+    unnumbered sections under it is an ordinary book: read as deep, each
+    chapter of Géron's "Uczenie maszynowe" became one section cut into
+    pages, a dozen notes named "<chapter> (continued)".
     """
-    numbered_above: list[tuple[int, bool]] = []
+    sections_above: list[tuple[int, bool]] = []
     for mark in bookmarks:
-        while numbered_above and numbered_above[-1][0] >= mark.level:
-            numbered_above.pop()
-        is_numbered = section_number(mark.title) is not None
-        if not is_numbered and any(numbered for _level, numbered in numbered_above):
+        while sections_above and sections_above[-1][0] >= mark.level:
+            sections_above.pop()
+        number = section_number(mark.title)
+        if number is None and any(section for _level, section in sections_above):
             return True
-        numbered_above.append((mark.level, is_numbered))
+        sections_above.append((mark.level, number is not None and "." in number))
     return False
 
 
