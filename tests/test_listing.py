@@ -113,9 +113,17 @@ def test_a_rebuilt_block_reaches_the_markdown_with_its_lines(monkeypatch) -> Non
 
 
 def test_a_programming_book_is_extracted_without_formulas() -> None:
-    settings = extract._batch_settings(1, 2, "eng", 0, "", listings=True)
+    formulas = listing.formulas_wanted("programming")
+    settings = extract._batch_settings(1, 2, "eng", 0, "", True, formulas)
     assert settings["listings"] is True
     assert settings["formulas"] is False
+
+
+def test_a_machine_learning_book_keeps_its_listings_and_its_formulas() -> None:
+    assert listing.wanted("Machine Learning")
+    assert listing.formulas_wanted("Machine Learning")
+    assert not listing.wanted("electronics")
+    assert listing.formulas_wanted("electronics")
 
 
 def test_a_kerning_gap_inside_a_word_is_not_a_space() -> None:

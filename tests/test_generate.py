@@ -553,6 +553,13 @@ def test_any_other_book_is_still_asked_for_formulas(chunk: Chunk) -> None:
     assert "## Code" not in prompt
 
 
+def test_a_machine_learning_book_is_asked_for_code_then_formulas(
+    chunk: Chunk,
+) -> None:
+    prompt = generate.note_prompt(chunk, "body", "Book", "machine learning")
+    assert prompt.index("## Code") < prompt.index("## Formulas")
+
+
 def test_assemble_puts_code_right_after_the_explanation(chunk: Chunk) -> None:
     sections = {
         "Glossary": "- pętla — loop",

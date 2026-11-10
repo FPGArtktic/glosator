@@ -290,6 +290,10 @@ of `Formulas`:
 --domain programming   ->   ## Explanation … ## Code (```c … ```) … ## Glossary
 ```
 
+A machine learning book has both: `--domain "machine learning"` keeps the
+listings as a programming book does, recognises the displayed formulas as
+any other book does, and gives its notes a `Code` and a `Formulas` section.
+
 Training slides are read as slides. A PDF whose pages are mostly landscape
 is taken for a slide deck: its notes explain each slide's few terse lines in
 prose instead of abridging them, and pass over the jumble of labels a

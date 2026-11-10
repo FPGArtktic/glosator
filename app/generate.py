@@ -370,9 +370,12 @@ def note_prompt(
     A programming book asks for its listings where any other book asks for
     its formulas: its code is what a reader needs without the book open, and
     its extraction recognises no formulas (docs/DECISIONS.md, 2026-11-02).
-    A slide deck's terse lines are explained rather than abridged.
+    A machine learning book asks for both. A slide deck's terse lines are
+    explained rather than abridged.
     """
-    technical = "code.md" if listing.wanted(domain) else "formulas.md"
+    technical = "\n\n".join(
+        load_prompt(name).strip() for name in _technical_prompts(domain)
+    )
     return render(
         load_prompt("note.md"),
         material=f"{domain} training slides" if slides else f"a {domain} textbook",
@@ -386,9 +389,15 @@ def note_prompt(
         language=language.name,
         analogy=language.analogy,
         glossary=load_prompt(language.glossary_prompt).strip(),
-        technical=load_prompt(technical).strip(),
+        technical=technical,
         parts=_parts_instruction(chunk),
     )
+
+
+def _technical_prompts(domain: str) -> list[str]:
+    """The Code section, the Formulas section, or both, in the note's order."""
+    names = ["code.md"] if listing.wanted(domain) else []
+    return names + (["formulas.md"] if listing.formulas_wanted(domain) else [])
 
 
 def _parts_instruction(chunk: Chunk) -> str:

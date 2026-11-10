@@ -162,6 +162,7 @@ def _do_extract(conn: sqlite3.Connection, job: sqlite3.Row) -> None:
             params.get("ocr_langs", config.OCR_LANGS),
             force=bool(params.get("force")),
             listings=listing.wanted(_domain(book)),
+            formulas=listing.formulas_wanted(_domain(book)),
         ).book_dir
     db.job_progress(conn, job["id"], 1, 1)
     db.stage_finish(

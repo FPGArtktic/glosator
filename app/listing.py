@@ -29,6 +29,18 @@ def wanted(domain: str) -> bool:
     return domain.strip().lower() in config.LISTING_DOMAINS
 
 
+def formulas_wanted(domain: str) -> bool:
+    """True for a book whose formulas are recognised and kept in its notes.
+
+    A programming book's are not: recognition read its code as mathematics.
+    """
+    name = domain.strip().lower()
+    return (
+        name not in config.LISTING_DOMAINS
+        or name in config.MATHEMATICAL_LISTING_DOMAINS
+    )
+
+
 def inside(
     glyphs: Sequence[Glyph], box: tuple[float, float, float, float]
 ) -> list[Glyph]:

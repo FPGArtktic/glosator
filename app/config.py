@@ -199,7 +199,12 @@ PREVIEW_PAGES: int = 3
 # Books whose code listings are rebuilt from the text layer and copied into
 # the notes. The domain is the one given to "glosator add --domain". Embedded
 # Linux is taught in commands, recipes, device trees and kernel modules.
-LISTING_DOMAINS: frozenset[str] = frozenset({"programming", "embedded linux"})
+LISTING_DOMAINS: frozenset[str] = frozenset(
+    {"programming", "embedded linux", "machine learning"}
+)
+# Listing domains whose displayed mathematics a reader needs as much as the
+# code: their formulas are recognised and their notes keep both (DECISIONS.md).
+MATHEMATICAL_LISTING_DOMAINS: frozenset[str] = frozenset({"machine learning"})
 # How far outside docling's box around a listing a character may sit and
 # still belong to it, in points: the box is drawn around ink, not glyph cells.
 LISTING_BOX_MARGIN_PT: float = 2.0

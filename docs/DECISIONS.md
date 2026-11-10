@@ -829,3 +829,25 @@ model adds it either: a pass by a hosted model over some 400 notes was
 considered and dropped for its cost in the operator's usage limit. The
 notes say what the slides say.
 
+## 2026-11-10 — A machine learning book keeps its code and its formulas
+
+Géron's *Uczenie maszynowe z użyciem Scikit-Learn, Keras i TensorFlow* was
+added as a programming book for its Python listings. A programming book has
+formula recognition off (2026-11-02), so its 110 displayed equations
+reached the chunks as `<!-- formula-not-decoded -->`, and its notes
+described a cost function or an attention score in words.
+
+`--domain "machine learning"` is a listing domain whose formulas are
+recognised as well (`config.MATHEMATICAL_LISTING_DOMAINS`): extraction
+rebuilds the listings from the text layer and keeps formula recognition on,
+and the note prompt asks for a `Code` section and then a `Formulas`
+section. This changes the output contract in `CLAUDE.md`, where `Code`
+stands "in place of Formulas": for this domain it stands before it. No
+migration: a note is regenerated whole, and every other domain gets the
+sections it got before.
+
+The risk the 2026-11-02 pilot found, short code fragments recognised as
+mathematics, stays for this domain. The listings themselves are rebuilt from
+the text layer whatever the recognition read; the re-extracted Géron is
+checked for fragments turned into LaTeX before its notes are regenerated.
+

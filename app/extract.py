@@ -196,6 +196,7 @@ def run(
     *,
     force: bool = False,
     listings: bool = False,
+    formulas: bool = True,
 ) -> ExtractResult:
     """Extract a page range, batch by batch, each batch in a child process.
 
@@ -203,8 +204,9 @@ def run(
     ``force``, so a stopped extraction of a long book resumes instead of
     starting over. The chapter files and ``figures.json`` are rewritten from
     all batches at the end. ``listings`` rebuilds the code listings of a
-    programming book from the text layer, and turns formula recognition off,
-    which read code as mathematics.
+    programming book from the text layer. ``formulas`` turns formula
+    recognition on, which a programming book has off: it read code as
+    mathematics.
     """
     book_dir = config.WORK_DIR / book_slug
     (book_dir / "figures").mkdir(parents=True, exist_ok=True)
@@ -214,7 +216,9 @@ def run(
     ocr_pages: list[int] = []
     heading = ""
     for start, end in batches(first_page, last_page):
-        wanted = _batch_settings(start, end, ocr_langs, len(figures), heading, listings)
+        wanted = _batch_settings(
+            start, end, ocr_langs, len(figures), heading, listings, formulas
+        )
         record = None if force else _reusable_batch(book_dir, wanted)
         if record is None:
             record = _run_batch_child(book_slug, pdf_path, wanted)
@@ -250,6 +254,7 @@ def _batch_settings(
     figure_offset: int,
     heading: str,
     listings: bool = False,
+    formulas: bool = True,
 ) -> dict[str, object]:
     """Everything a batch's output depends on. A batch is reused only on a match.
 
@@ -261,7 +266,7 @@ def _batch_settings(
         "format": BATCH_FORMAT,
         "pages": [first_page, last_page],
         "ocr_langs": ocr_langs,
-        "formulas": config.DOCLING_FORMULAS and not listings,
+        "formulas": config.DOCLING_FORMULAS and formulas,
         "listings": listings,
         "figure_offset": figure_offset,
         "heading": heading,
