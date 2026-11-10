@@ -5,6 +5,24 @@ Notable changes to glosator, newest first. Versions follow
 The reasons behind the larger decisions are in
 [docs/DECISIONS.md](docs/DECISIONS.md).
 
+## [0.8.0] — 2026-11-10
+
+### Added
+- `--domain "machine learning"`: the listings are kept as in a
+  programming book and the displayed formulas are recognised as in any
+  other; the notes have a `Code` and a `Formulas` section.
+
+### Fixed
+- The letters of a Cambria Math font with a broken character map (a
+  subscript 1 as the Oriya letter U+0B35, a parenthesis as U+123A) are
+  read as the letters, digits and delimiters they show. Notes copied
+  them as a row of Indic and Ethiopic letters.
+- A note or warning set beside an icon, which docling reads as a table
+  of one header row, is a quote. Notes copied it as a one-cell table.
+- The note prompt says that an example the book gives is not an
+  analogy; most of Géron's notes labelled the book's examples
+  "przez analogię".
+
 ## [0.7.11] — 2026-11-09
 
 ### Fixed
@@ -297,6 +315,7 @@ The first release: from a PDF to study notes in an Obsidian vault.
   completed or corrected.
 - A watermark digest the shop prints on every page is dropped.
 
+[0.8.0]: https://github.com/FPGArtktic/glosator/compare/v0.7.11...v0.8.0
 [0.7.11]: https://github.com/FPGArtktic/glosator/compare/v0.7.10...v0.7.11
 [0.7.10]: https://github.com/FPGArtktic/glosator/compare/v0.7.9...v0.7.10
 [0.7.9]: https://github.com/FPGArtktic/glosator/compare/v0.7.8...v0.7.9
