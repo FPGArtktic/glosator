@@ -851,3 +851,12 @@ mathematics, stays for this domain. The listings themselves are rebuilt from
 the text layer whatever the recognition read; the re-extracted Géron is
 checked for fragments turned into LaTeX before its notes are regenerated.
 
+## 2026-11-10 — The domain with code and formulas is "applied machine learning"
+
+The entry above named it "machine learning", which Albrzykowski's book of
+the mathematics of machine learning already had. That book has no code: as
+a listing domain it would have been planned in smaller chunks and every
+note would have carried an empty `Code` section. The domain that keeps both
+is `applied machine learning`; `machine learning` stays a domain with
+formulas only.
+

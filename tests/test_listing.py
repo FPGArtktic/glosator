@@ -119,9 +119,10 @@ def test_a_programming_book_is_extracted_without_formulas() -> None:
     assert settings["formulas"] is False
 
 
-def test_a_machine_learning_book_keeps_its_listings_and_its_formulas() -> None:
-    assert listing.wanted("Machine Learning")
-    assert listing.formulas_wanted("Machine Learning")
+def test_an_applied_machine_learning_book_keeps_listings_and_formulas() -> None:
+    assert listing.wanted("Applied Machine Learning")
+    assert listing.formulas_wanted("Applied Machine Learning")
+    assert not listing.wanted("machine learning")
     assert not listing.wanted("electronics")
     assert listing.formulas_wanted("electronics")
 

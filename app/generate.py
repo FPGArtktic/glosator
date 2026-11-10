@@ -370,7 +370,7 @@ def note_prompt(
     A programming book asks for its listings where any other book asks for
     its formulas: its code is what a reader needs without the book open, and
     its extraction recognises no formulas (docs/DECISIONS.md, 2026-11-02).
-    A machine learning book asks for both. A slide deck's terse lines are
+    An applied machine learning book asks for both. A slide deck's terse lines are
     explained rather than abridged.
     """
     technical = "\n\n".join(
