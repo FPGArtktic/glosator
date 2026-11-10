@@ -5,6 +5,15 @@ Notable changes to glosator, newest first. Versions follow
 The reasons behind the larger decisions are in
 [docs/DECISIONS.md](docs/DECISIONS.md).
 
+## [0.8.3] — 2026-11-10
+
+### Fixed
+- A block whose text layer is control characters, as every listing of
+  a book set in a font without a usable character map, is read from the
+  page image by tesseract. The page had a text layer, so it was never
+  given to OCR, and the notes got the garbage or no code at all. Books
+  extracted before keep their pages until extracted again.
+
 ## [0.8.2] — 2026-11-10
 
 ### Fixed
@@ -335,6 +344,7 @@ The first release: from a PDF to study notes in an Obsidian vault.
   completed or corrected.
 - A watermark digest the shop prints on every page is dropped.
 
+[0.8.3]: https://github.com/FPGArtktic/glosator/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/FPGArtktic/glosator/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/FPGArtktic/glosator/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/FPGArtktic/glosator/compare/v0.7.11...v0.8.0
