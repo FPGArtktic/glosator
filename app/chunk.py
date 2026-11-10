@@ -421,7 +421,7 @@ def readable_text(
         # footer: the book's title, the page number and the watermark digest.
         extracted = _extracted_page(book_slug, page)
         text = without_furniture(layer if extracted is None else extracted, pdf_path)
-        text = mathfont.restore(text)
+        text = mathfont.restore(extract.icon_boxes_as_quotes(text))
         if text:
             texts.append(text)
     return PAGE_SEPARATOR.join(texts)

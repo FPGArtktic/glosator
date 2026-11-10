@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import ctypes
+import itertools
 import json
 import os
 import re
@@ -48,6 +49,8 @@ FIGURES_JSON = "figures.json"
 TABLE_ROW_RE = re.compile(r"^\|.*\|[ \t]*$", re.MULTILINE)
 TABLE_PADDING_RE = re.compile(r"[ \t]{2,}")
 TABLE_RULE_RE = re.compile(r"-{4,}")
+# The rule under a markdown table's header row: "| --- | :-: |".
+TABLE_HEADER_RULE_RE = re.compile(r"^\s*\|(?:\s*:?-+:?\s*\|)+\s*$")
 # The shape of a per-copy watermark: an MD5-sized lowercase hex digest.
 WATERMARK_RE = re.compile(r"\b[0-9a-f]{32}\b")
 PAGES_DIR = "pages"
@@ -668,6 +671,36 @@ def compact_tables(markdown: str) -> str:
 def _compact_row(match: re.Match[str]) -> str:
     row = TABLE_PADDING_RE.sub(" ", match.group(0))
     return TABLE_RULE_RE.sub("---", row)
+
+
+def icon_boxes_as_quotes(markdown: str) -> str:
+    """A box set beside an icon, as a quotation rather than a table of one row.
+
+    docling reads a note or a warning printed beside an icon as a table: an
+    empty cell where the icon is, the whole text of the box in the other, and
+    no row under the header. The model copies every table whole, so the notes
+    of a C book carried a paragraph each as one table cell, fifteen times.
+    """
+    kept: list[str] = []
+    for is_table, rows in itertools.groupby(markdown.split("\n"), key=_is_table_row):
+        block = list(rows)
+        text = _icon_box_text(block) if is_table else None
+        kept += block if text is None else [f"> {text}"]
+    return "\n".join(kept)
+
+
+def _is_table_row(line: str) -> bool:
+    return line.lstrip().startswith("|")
+
+
+def _icon_box_text(rows: list[str]) -> str | None:
+    """The box's text, if the table is a header row of two cells, one empty."""
+    if len(rows) != 2 or not TABLE_HEADER_RULE_RE.match(rows[1]):
+        return None
+    cells = [cell.strip() for cell in rows[0].strip().strip("|").split("|")]
+    if len(cells) != 2 or cells[0] or not cells[1]:
+        return None
+    return cells[1]
 
 
 def _write_json(path: Path, payload: object) -> None:

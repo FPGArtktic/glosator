@@ -477,3 +477,15 @@ def test_dropping_a_watermark_keeps_code_indentation() -> None:
     listing = "```\nint main(void)\n{\n    return 0;\n}\n```"
     pages = [f"{listing}\n{MARK}", MARK, MARK]
     assert extract.drop_watermarks(pages)[0] == f"{listing}\n"
+
+
+def test_a_box_beside_an_icon_is_a_quote_not_a_table() -> None:
+    markdown = "Text.\n\n|  | A note on assert. |\n| --- | --- |\n\nMore text."
+    assert extract.icon_boxes_as_quotes(markdown) == (
+        "Text.\n\n> A note on assert.\n\nMore text."
+    )
+
+
+def test_a_table_with_an_empty_corner_and_rows_stays_a_table() -> None:
+    markdown = "| | Needed |\n|---|---|\n| T0 | 7 4 3 |\n"
+    assert extract.icon_boxes_as_quotes(markdown) == markdown
