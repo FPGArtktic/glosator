@@ -477,3 +477,45 @@ def test_dropping_a_watermark_keeps_code_indentation() -> None:
     listing = "```\nint main(void)\n{\n    return 0;\n}\n```"
     pages = [f"{listing}\n{MARK}", MARK, MARK]
     assert extract.drop_watermarks(pages)[0] == f"{listing}\n"
+
+
+# A listing of "Design Your Own Video Game Console" as its text layer reads it.
+GARBLED_LISTING = (
+    "\ufffd=H \ufffd+ IE7@ 8 \ufffd\ufffd \x0e\x0f\x10\x11 \ufffd\ufffd\ufffd"
+)
+
+
+def test_a_block_of_control_characters_is_garbled() -> None:
+    assert extract.garbled(GARBLED_LISTING)
+    assert not extract.garbled("MOV M, #$0F ; set MODE to direction control")
+    assert not extract.garbled("one\ttab\nand a newline\r\n")
+    assert not extract.garbled("")
+
+
+def test_a_garbled_block_is_read_from_the_page_image(monkeypatch) -> None:
+    pytest.importorskip("docling_core")
+    from docling_core.types.doc.base import BoundingBox, CoordOrigin, Size
+    from docling_core.types.doc.document import DoclingDocument, ProvenanceItem
+    from PIL import Image
+
+    document = DoclingDocument(name="sample")
+    document.add_page(page_no=1, size=Size(width=595.0, height=842.0))
+    bbox = BoundingBox(l=72, t=700, r=400, b=650, coord_origin=CoordOrigin.BOTTOMLEFT)
+    prov = ProvenanceItem(page_no=1, bbox=bbox, charspan=(0, 1))
+    document.add_text(label="text", text="Turn port C to an output:", prov=prov)
+    document.add_code(text=GARBLED_LISTING, prov=prov)
+    lines = ["MOV M, #$0F     ; set MODE", "MOV !RC, #%00000000"]
+    crops = []
+    monkeypatch.setattr(
+        extract.pdf, "render_page", lambda *_args, **_kw: Image.new("L", (2480, 3508))
+    )
+    monkeypatch.setattr(
+        extract, "ocr_block", lambda image, _langs: crops.append(image.size) or lines
+    )
+
+    assert extract.read_garbled_blocks(document, Path("/b.pdf"), "eng") == 1
+    markdown = extract.page_markdown(document)
+    assert "Turn port C to an output:" in markdown
+    assert "```\nMOV M, #$0F     ; set MODE\nMOV !RC, #%00000000\n```" in markdown
+    # 328 x 50 pt and 6 pt of padding on each side, at 300 dpi.
+    assert crops == [(1417, 258)]

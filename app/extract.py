@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import ctypes
+import io
 import json
 import os
 import re
@@ -58,7 +59,10 @@ WATERMARK_RE = re.compile(r"\b[0-9a-f]{32}\b")
 PAGES_DIR = "pages"
 BATCHES_DIR = "batches"
 # Bumped when what a batch writes changes, so older batches are not reused.
-BATCH_FORMAT = 2
+BATCH_FORMAT = 3
+# tesseract's page segmentation mode for one uniform block of text: a crop
+# is one block, and the default mode looks for columns in it.
+TESSERACT_UNIFORM_BLOCK = "6"
 # From <linux/prctl.h>: deliver a signal to this process when its parent dies.
 PR_SET_PDEATHSIG = 1
 
@@ -473,6 +477,7 @@ def extract_batch(book_slug: str, pdf_path: Path, settings: dict[str, object]) -
     if settings.get("listings"):
         rebuild_listings(document, pdf_path)
         code_formulas_as_listings(document, pdf_path)
+    read_garbled_blocks(document, pdf_path, str(settings["ocr_langs"]))
     _write_pages(book_slug, document, first_page, last_page)
     figures, last_heading = _write_figures(
         book_dir,
@@ -640,6 +645,83 @@ def code_formulas_as_listings(document, pdf_path: Path) -> int:
     document.delete_items(node_items=turned)
     log.event("extract", "formulas turned into listings", count=len(turned))
     return len(turned)
+
+
+def garbled(text: str) -> bool:
+    """True when a share of the text is characters no font prints."""
+    if not text:
+        return False
+    unprintable = sum(_unprintable(character) for character in text)
+    return unprintable >= config.GARBLED_MIN_SHARE * len(text)
+
+
+def _unprintable(character: str) -> bool:
+    if character == "\ufffd":
+        return True
+    return unicodedata.category(character) == "Cc" and character not in "\n\r\t"
+
+
+def read_garbled_blocks(document, pdf_path: Path, ocr_langs: str) -> int:
+    """Read each block whose text layer is garbage from the page image instead.
+
+    A font without a usable character map reaches the text layer as control
+    characters: every listing of "Design Your Own Video Game Console" came
+    out as "\x0e\x0f 8 \ufffd\ufffd", four times over for a font drawn four
+    times as bold, and its notes had no code. OCR applies only to pages with
+    no text layer, and a whole page read by OCR loses the prose it read well,
+    so only the garbled block is read again. Returns how many it read.
+    """
+    images: dict[int, Image.Image] = {}
+    read = 0
+    for item, _level in document.iterate_items():
+        if not garbled(getattr(item, "text", "")) or len(item.prov) != 1:
+            continue
+        page = item.prov[0].page_no
+        if page not in images:
+            images[page] = pdf.render_page(pdf_path, page, dpi=config.GARBLED_OCR_DPI)
+        box = bbox_to_pixels(
+            _box(document, item),
+            document.pages[page].size.height,
+            dpi=config.GARBLED_OCR_DPI,
+            pad_pt=config.GARBLED_OCR_PAD_PT,
+        )
+        item.text = _block_text(item, ocr_block(images[page].crop(box), ocr_langs))
+        read += 1
+    log.event("extract", "garbled blocks read by OCR", count=read)
+    return read
+
+
+def _block_text(item, lines: list[str]) -> str:
+    """A listing keeps its lines; a heading or a paragraph is one line."""
+    from docling_core.types.doc.labels import DocItemLabel
+
+    if getattr(item, "label", None) == DocItemLabel.CODE:
+        return "\n".join(lines)
+    return " ".join(line.strip() for line in lines)
+
+
+def ocr_block(image: Image.Image, ocr_langs: str) -> list[str]:
+    """tesseract's lines for one block, its spacing inside a line kept."""
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    result = subprocess.run(
+        [
+            "tesseract",
+            "stdin",
+            "stdout",
+            "--psm",
+            TESSERACT_UNIFORM_BLOCK,
+            "-l",
+            ocr_langs,
+            "-c",
+            "preserve_interword_spaces=1",
+        ],
+        input=buffer.getvalue(),
+        capture_output=True,
+        check=True,
+    )
+    text = result.stdout.decode("utf-8")
+    return [line.rstrip() for line in text.splitlines() if line.strip()]
 
 
 def _box(document, item) -> tuple[float, float, float, float]:

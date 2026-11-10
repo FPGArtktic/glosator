@@ -163,6 +163,18 @@ DOCLING_MODELS: Path = _path("DOCLING_ARTIFACTS_PATH", "/opt/models/docling")
 # handed to OCR. Running heads and page numbers alone stay well under it.
 TEXT_LAYER_MIN_CHARS: int = 180
 
+# A text block with at least this share of characters no font prints
+# (control characters, the replacement character) has a broken text layer
+# and is read from the page image instead. Every listing of "Design Your Own
+# Video Game Console" reads 50-70 % control characters; a clean page of any
+# book reads none.
+GARBLED_MIN_SHARE: float = 0.2
+# The page is rendered at this resolution for that reading: tesseract misreads
+# the small monospaced listing type at the figure resolution.
+GARBLED_OCR_DPI: int = 300
+# Padding around the block's box, so the first and last letters are whole.
+GARBLED_OCR_PAD_PT: float = 6.0
+
 # Figure crops: rendered at this resolution and padded, because docling
 # bounding boxes sit tight against axis labels.
 FIGURE_DPI: int = 200
