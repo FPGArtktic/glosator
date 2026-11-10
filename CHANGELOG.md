@@ -5,6 +5,14 @@ Notable changes to glosator, newest first. Versions follow
 The reasons behind the larger decisions are in
 [docs/DECISIONS.md](docs/DECISIONS.md).
 
+## [0.8.2] — 2026-11-10
+
+### Fixed
+- In a book whose listings are rebuilt, a short listing that docling
+  took for a displayed formula is laid out as code from the text layer.
+  With formula recognition on it came out as LaTeX ("\\gg \\text { from
+  sklearn ... }"); with it off it was lost as "formula-not-decoded".
+
 ## [0.8.1] — 2026-11-10
 
 ### Fixed
@@ -327,6 +335,7 @@ The first release: from a PDF to study notes in an Obsidian vault.
   completed or corrected.
 - A watermark digest the shop prints on every page is dropped.
 
+[0.8.2]: https://github.com/FPGArtktic/glosator/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/FPGArtktic/glosator/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/FPGArtktic/glosator/compare/v0.7.11...v0.8.0
 [0.7.11]: https://github.com/FPGArtktic/glosator/compare/v0.7.10...v0.7.11
