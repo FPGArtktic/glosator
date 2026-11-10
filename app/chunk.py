@@ -19,7 +19,7 @@ from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path
 
-from app import book, config, epub, extract, log
+from app import book, config, epub, extract, log, mathfont
 from app.pdf import Bookmark
 
 CHAPTER_PREFIX_RE = re.compile(
@@ -421,6 +421,7 @@ def readable_text(
         # footer: the book's title, the page number and the watermark digest.
         extracted = _extracted_page(book_slug, page)
         text = without_furniture(layer if extracted is None else extracted, pdf_path)
+        text = mathfont.restore(text)
         if text:
             texts.append(text)
     return PAGE_SEPARATOR.join(texts)
