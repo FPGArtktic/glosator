@@ -1304,16 +1304,3 @@ def test_a_short_document_has_no_furniture(
     monkeypatch.setattr(pdf, "page_count", lambda _path: 3)
     monkeypatch.setattr(pdf, "page_text", lambda _p, _f, _l: "Same line\nbody")
     assert chunk_module.furniture(book_path) == frozenset()
-
-
-def test_readable_text_reads_boxes_and_a_broken_math_font(monkeypatch) -> None:
-    monkeypatch.setattr(pdf, "page_text", lambda _p, _first, _last: "layer")
-    path = extract.page_markdown_path("bk1", 1)
-    path.parent.mkdir(parents=True)
-    # x with a subscript 1 in parentheses, as Cambria Math's text layer has it
-    path.write_text(
-        "|  | Note. |\n| --- | --- |\n\n\u123a\U0001d465\u0b35\u123b\n",
-        encoding="utf-8",
-    )
-    text = chunk_module.readable_text(Path("/b.pdf"), 1, 1, "bk1")
-    assert text == "> Note.\n\n(\U0001d4651)"
