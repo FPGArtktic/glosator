@@ -18,8 +18,10 @@ after them:
 Two to four sentences: what this is and why it matters.
 
 ## Explanation
-Plain language, 300-700 words. Analogies are allowed but must be marked as
-analogies ("{{analogy}}, ..."). Explain every symbol you use.
+Plain language, 300-700 words. An analogy of your own is allowed but must be
+marked as one ("{{analogy}}, ..."). An example, a comparison or a case the
+source gives is not your analogy: tell it as the source does, without that
+marker. Explain every symbol you use.
 Every table the source prints goes into the explanation whole, as a markdown
 table next to the paragraph about it: every row and every cell as the source
 has them, also where it reaches you as a block of aligned text rather than a

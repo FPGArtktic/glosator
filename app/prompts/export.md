@@ -36,8 +36,10 @@ after them:
 Two to four sentences: what this is and why it matters.
 
 ## Explanation
-Plain language, 300-700 words. Analogies are allowed but must be marked as
-analogies ("{{analogy}}, ..."). Explain every symbol you use.
+Plain language, 300-700 words. An analogy of your own is allowed but must be
+marked as one ("{{analogy}}, ..."). An example, a comparison or a case the
+source gives is not your analogy: tell it as the source does, without that
+marker. Explain every symbol you use.
 
 ## Formulas
 Every formula the section uses, each on its own line between $$ and $$,

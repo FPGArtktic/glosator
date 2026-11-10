@@ -68,6 +68,7 @@ def test_the_analogy_marker_is_quoted_in_the_notes_language(chunk: Chunk) -> Non
     assert "as an analogy" not in polish
     english = generate.note_prompt(chunk, "body", "Book", "electronics")
     assert '("as an analogy, ...")' in english
+    assert "not your analogy" in english
 
 
 def test_a_slide_deck_asks_for_the_slides_to_be_explained(chunk: Chunk) -> None:
