@@ -48,6 +48,11 @@ FIGURES_JSON = "figures.json"
 TABLE_ROW_RE = re.compile(r"^\|.*\|[ \t]*$", re.MULTILINE)
 TABLE_PADDING_RE = re.compile(r"[ \t]{2,}")
 TABLE_RULE_RE = re.compile(r"-{4,}")
+# What the text under a formula's box holds only if the box is code: a
+# Python prompt, an import, a call on a dotted name, a snake_case name.
+CODE_IN_FORMULA_RE = re.compile(
+    r">>>|\bimport\b|\b\w+\.\w+\(|\b[a-z]+_[a-z_]+\b", re.ASCII
+)
 # The shape of a per-copy watermark: an MD5-sized lowercase hex digest.
 WATERMARK_RE = re.compile(r"\b[0-9a-f]{32}\b")
 PAGES_DIR = "pages"
@@ -467,6 +472,7 @@ def extract_batch(book_slug: str, pdf_path: Path, settings: dict[str, object]) -
     )
     if settings.get("listings"):
         rebuild_listings(document, pdf_path)
+        code_formulas_as_listings(document, pdf_path)
     _write_pages(book_slug, document, first_page, last_page)
     figures, last_heading = _write_figures(
         book_dir,
@@ -605,6 +611,35 @@ def rebuild_listings(document, pdf_path: Path) -> int:
             rebuilt += 1
     log.event("extract", "listings rebuilt", count=rebuilt)
     return rebuilt
+
+
+def code_formulas_as_listings(document, pdf_path: Path) -> int:
+    """Turn each formula box that holds code into a code block, laid out again.
+
+    docling's layout model takes some short listings for displayed formulas.
+    With recognition on, Géron's "from sklearn.linear_model import Lasso"
+    came out as "\\gg \\text { from sklearn.linear_model } \\text { import }";
+    with it off, the listing was "formula-not-decoded" and lost. The text
+    layer under the box tells code from mathematics, which a Word or TeX
+    book sets in mathematical italic. Returns how many boxes were turned.
+    """
+    from docling_core.types.doc.labels import DocItemLabel
+
+    glyphs: dict[int, list[pdf.Glyph]] = {}
+    turned = []
+    for item, _level in document.iterate_items():
+        if getattr(item, "label", None) != DocItemLabel.FORMULA or len(item.prov) != 1:
+            continue
+        page = item.prov[0].page_no
+        if page not in glyphs:
+            glyphs[page] = pdf.page_glyphs(pdf_path, page)
+        text = listing.layout(listing.inside(glyphs[page], _box(document, item)))
+        if CODE_IN_FORMULA_RE.search(text):
+            document.insert_code(sibling=item, text=text, prov=item.prov[0])
+            turned.append(item)
+    document.delete_items(node_items=turned)
+    log.event("extract", "formulas turned into listings", count=len(turned))
+    return len(turned)
 
 
 def _box(document, item) -> tuple[float, float, float, float]:

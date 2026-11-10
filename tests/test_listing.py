@@ -170,3 +170,45 @@ def test_a_line_of_prose_in_the_box_does_not_shift_the_listing() -> None:
         )
         left += width
     assert listing.layout(glyphs) == "Text\n" + PROGRAM
+
+
+def _formula_document(text: str, lines: int):
+    from docling_core.types.doc.base import BoundingBox, CoordOrigin, Size
+    from docling_core.types.doc.document import DoclingDocument, ProvenanceItem
+
+    document = DoclingDocument(name="sample")
+    document.add_page(page_no=1, size=Size(width=595.0, height=842.0))
+    bbox = BoundingBox(
+        l=MARGIN,
+        t=TOP,
+        r=MARGIN + 60 * CELL,
+        b=TOP - (lines - 1) * LEADING - HEIGHT,
+        coord_origin=CoordOrigin.BOTTOMLEFT,
+    )
+    document.add_formula(
+        text=text, prov=ProvenanceItem(page_no=1, bbox=bbox, charspan=(0, 1))
+    )
+    return document
+
+
+def test_code_read_as_a_formula_becomes_a_listing(monkeypatch) -> None:
+    pytest.importorskip("docling_core")
+    code = (
+        ">>> from sklearn.linear_model import Lasso\n>>> lasso_reg = Lasso(alpha=0.1)"
+    )
+    document = _formula_document("\\gg \\text { from sklearn }", 2)
+    monkeypatch.setattr(extract.pdf, "page_glyphs", lambda *_args: monospaced(code))
+
+    assert extract.code_formulas_as_listings(document, Path("/b.pdf")) == 1
+    assert f"```\n{code}\n```" in extract.page_markdown(document)
+
+
+def test_a_formula_over_mathematical_italic_stays_a_formula(monkeypatch) -> None:
+    pytest.importorskip("docling_core")
+    # y = theta_0 + theta_1 x, as a Word book sets it: mathematical italic
+    italic = "\U0001d466 = \U0001d703 + \U0001d703\U0001d465"
+    document = _formula_document("y = \\theta_0 + \\theta_1 x", 1)
+    monkeypatch.setattr(extract.pdf, "page_glyphs", lambda *_args: monospaced(italic))
+
+    assert extract.code_formulas_as_listings(document, Path("/b.pdf")) == 0
+    assert "\\theta_0" in extract.page_markdown(document)
