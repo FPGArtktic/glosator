@@ -5,10 +5,22 @@ Notable changes to glosator, newest first. Versions follow
 The reasons behind the larger decisions are in
 [docs/DECISIONS.md](docs/DECISIONS.md).
 
+## [0.8.1] — 2026-11-10
+
+### Fixed
+- The domain that keeps both code and formulas is `applied machine
+  learning`. 0.8.0 gave that meaning to `machine learning`, a domain a
+  book of the mathematics already had; it stays a domain of formulas.
+
+### Removed
+- The conversion of an icon box from a table to a quote when chunking,
+  added in 0.8.0. The EPUB reader has done it since 0.7.8; the book that
+  showed the tables had been extracted before that.
+
 ## [0.8.0] — 2026-11-10
 
 ### Added
-- `--domain "machine learning"`: the listings are kept as in a
+- `--domain "machine learning"` (renamed in 0.8.1): the listings are kept as in a
   programming book and the displayed formulas are recognised as in any
   other; the notes have a `Code` and a `Formulas` section.
 
@@ -315,6 +327,7 @@ The first release: from a PDF to study notes in an Obsidian vault.
   completed or corrected.
 - A watermark digest the shop prints on every page is dropped.
 
+[0.8.1]: https://github.com/FPGArtktic/glosator/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/FPGArtktic/glosator/compare/v0.7.11...v0.8.0
 [0.7.11]: https://github.com/FPGArtktic/glosator/compare/v0.7.10...v0.7.11
 [0.7.10]: https://github.com/FPGArtktic/glosator/compare/v0.7.9...v0.7.10
